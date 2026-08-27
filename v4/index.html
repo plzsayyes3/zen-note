@@ -200,7 +200,8 @@
     flex:0 0 auto;
     width:100%;
     min-height:84px;
-    max-height:150px;
+    max-height:200px;
+    overflow-y:auto;
     resize:none;
     background:var(--field-bg);
     border:1.5px solid var(--hairline);
@@ -474,7 +475,7 @@ const DEFAULTS = {
   folder: "00_inbox",
 };
 
-const SILENCE_MS = 1600;   // これだけ無音(=inputイベントが来ない)が続いたら1行として確定する
+const SILENCE_MS = 5000;   // これだけ無音(=inputイベントが来ない)が続いたら1行として確定する
 const SYNC_DEBOUNCE_MS = 3500; // 行確定からこれだけ経ったらGitHubへまとめて送る(連続する発話を1回にまとめる)
 
 const el = (id) => document.getElementById(id);
