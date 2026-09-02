@@ -3,81 +3,43 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<meta name="mobile-web-app-capable" content="yes">
 <title>禅ノート v2v — 縦書き</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400&family=Zen+Old+Mincho:wght@400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#1c1b19;--paper:#eae4d8;--muted:#8c8577;--line:#33312c;--red:#b23a2e;--step:36px;--col:30px}
-*{box-sizing:border-box;margin:0;padding:0}html,body{width:100%;height:100dvh}body{overflow:hidden;background:var(--bg);color:var(--paper);font-family:'Noto Serif JP','Zen Old Mincho',serif;-webkit-font-smoothing:antialiased}
-.stage{position:fixed;left:50%;top:50%;width:min(680px,86vw);height:min(78dvh,620px);transform:translate(-50%,-50%);overflow:hidden;mask-image:linear-gradient(to right,transparent,rgba(0,0,0,.2) 12%,rgba(0,0,0,.65) 30%,#000 45%,#000 55%,rgba(0,0,0,.65) 70%,rgba(0,0,0,.2) 88%,transparent);-webkit-mask-image:linear-gradient(to right,transparent,rgba(0,0,0,.2) 12%,rgba(0,0,0,.65) 30%,#000 45%,#000 55%,rgba(0,0,0,.65) 70%,rgba(0,0,0,.2) 88%,transparent)}
-.spine{position:fixed;left:24px;top:50%;transform:translateY(-50%);writing-mode:vertical-rl;letter-spacing:.5em;font-size:15px;color:var(--muted);opacity:.55;pointer-events:none}.dot{display:block;width:4px;height:4px;border-radius:50%;background:var(--red);margin:0 auto 14px}
-.columns{position:absolute;inset:0;pointer-events:none}.column{position:absolute;top:0;height:100%;width:var(--col);writing-mode:vertical-rl;text-orientation:mixed;font-size:19px;line-height:var(--step);font-weight:300;white-space:pre-wrap;overflow:visible;opacity:.32;transition:opacity .12s}.column.active{opacity:1}.column.faded{opacity:.12}.ch{display:inline}
-.caret-guide{position:absolute;left:50%;top:50%;width:var(--col);height:var(--step);transform:translate(-50%,-50%);border:1.5px solid var(--red);border-radius:8px;background:rgba(178,58,46,.06);opacity:.18;pointer-events:none;z-index:2}.input-active .caret-guide{opacity:.95;animation:blink 1s steps(1,end) infinite}@keyframes blink{50%{opacity:.22}}
-#editor{position:absolute;inset:0;width:100%;height:100%;z-index:3;padding:0;border:0;outline:0;resize:none;background:transparent;color:transparent;caret-color:transparent;font:16px/1 sans-serif;opacity:0;cursor:text;pointer-events:auto;-webkit-appearance:none}
-.gear{position:fixed;z-index:10;top:22px;right:26px;width:30px;height:30px;color:var(--muted);opacity:.35;cursor:pointer;background:none;border:0}.gear svg{width:17px;height:17px}
-.status{position:fixed;z-index:10;bottom:22px;left:0;right:0;display:flex;justify-content:center;pointer-events:none}.status-inner{width:min(680px,86vw);display:flex;justify-content:space-between;font:11px 'JetBrains Mono',monospace;color:var(--muted)}.save-hint{pointer-events:auto;cursor:pointer;opacity:.75;background:none;border:0;font:inherit;color:inherit}.count{opacity:.7}
-.err{position:fixed;z-index:30;bottom:52px;left:0;right:0;display:flex;justify-content:center;pointer-events:none}.err-inner{font:11.5px 'JetBrains Mono',monospace;color:var(--red);background:rgba(178,58,46,.18);padding:6px 12px;border-radius:2px;opacity:0;transition:opacity .3s}.err-inner.show{opacity:1}
-.stamp{position:fixed;z-index:25;top:50%;left:50%;width:104px;height:104px;transform:translate(-50%,-50%) scale(.4) rotate(-8deg);border:3px solid var(--red);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--red);font-family:'Zen Old Mincho',serif;font-size:44px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}.stamp.on{opacity:.92;transform:translate(-50%,-50%) scale(1) rotate(-8deg)}.stamp.out{opacity:0;transform:translate(-50%,-50%) scale(1.08) rotate(-8deg);transition:.6s}
-.overlay{position:fixed;inset:0;z-index:40;background:rgba(10,10,9,.72);display:none;align-items:center;justify-content:center}.overlay.open{display:flex}.modal{width:min(400px,88vw);max-height:86vh;overflow:auto;background:#211f1c;border:1px solid var(--line);border-radius:4px;padding:28px 26px 22px}.modal h2{font-size:15px;font-weight:400;margin-bottom:4px}.sub{font:10.5px 'JetBrains Mono',monospace;color:var(--muted);margin-bottom:20px}.field{margin-bottom:14px}.field label{display:block;font:10.5px 'JetBrains Mono',monospace;color:var(--muted);margin-bottom:6px}.field input{width:100%;padding:9px 10px;background:#171614;border:1px solid var(--line);border-radius:3px;color:var(--paper);font:12.5px 'JetBrains Mono',monospace;outline:0}.hint{font:10px 'JetBrains Mono',monospace;color:var(--muted);line-height:1.6}.actions{display:flex;justify-content:space-between;margin-top:20px}.btn{font:11.5px 'JetBrains Mono',monospace;padding:9px 16px;border-radius:3px;cursor:pointer;border:1px solid transparent}.primary{background:var(--red);color:#f4ede4;border-color:var(--red)}.ghost{background:none;color:var(--muted);border-color:var(--line)}
-@media(max-width:600px){:root{--col:28px;--step:34px}.stage{width:86vw;height:min(76dvh,560px)}.column{font-size:18px}.spine{left:14px}}
+:root{--bg:#1c1b19;--paper:#eae4d8;--muted:#8c8577;--line:#33312c;--red:#b23a2e;--step:36px;--col:30px;--padY:24px}
+*{box-sizing:border-box;margin:0;padding:0}html,body{width:100%;height:100dvh}body{overflow:hidden;background:var(--bg);color:var(--paper);font-family:'Noto Serif JP','Zen Old Mincho',serif}
+.stage{position:fixed;left:50%;top:50%;width:min(680px,86vw);height:min(78dvh,620px);transform:translate(-50%,-50%);overflow:hidden;padding:var(--padY) 0;}
+.columns{position:absolute;inset:var(--padY) 0;overflow:visible;pointer-events:none}
+.column{position:absolute;top:0;height:100%;width:var(--col);writing-mode:vertical-rl;text-orientation:mixed;font-size:19px;line-height:var(--step);font-weight:300;white-space:pre-wrap;overflow:visible;opacity:.32;transition:opacity .12s}.column.active{opacity:1}.column.faded{opacity:.12}.ch{display:inline}
+#editor{position:absolute;inset:0;width:100%;height:100%;z-index:3;padding:0;border:0;outline:0;resize:none;background:transparent;color:transparent;caret-color:transparent;font:16px/1 sans-serif;opacity:0;cursor:text}
+.caret-guide{position:absolute;left:50%;top:var(--padY);width:var(--col);height:var(--step);transform:translateX(-50%);border:1.5px solid var(--red);border-radius:8px;background:rgba(178,58,46,.06);opacity:.18;pointer-events:none;z-index:2;transition:top .08s ease}.input-active .caret-guide{opacity:.95;animation:blink 1s steps(1,end) infinite}@keyframes blink{50%{opacity:.22}}
+.gear{position:fixed;z-index:10;top:22px;right:26px;width:30px;height:30px;color:var(--muted);opacity:.35;cursor:pointer;background:none;border:0}.gear svg{width:17px;height:17px}.status{position:fixed;z-index:10;bottom:22px;left:0;right:0;display:flex;justify-content:center}.status-inner{width:min(680px,86vw);display:flex;justify-content:space-between;font:11px monospace;color:var(--muted)}.save-hint{cursor:pointer;background:none;border:0;font:inherit;color:inherit}.count{opacity:.7}
+.err{position:fixed;z-index:30;bottom:52px;left:0;right:0;text-align:center;font:11px monospace;color:var(--red)}.stamp{position:fixed;z-index:25;top:50%;left:50%;width:104px;height:104px;transform:translate(-50%,-50%) scale(.4) rotate(-8deg);border:3px solid var(--red);display:flex;align-items:center;justify-content:center;color:var(--red);font-size:44px;opacity:0;pointer-events:none}.stamp.on{opacity:.92;transform:translate(-50%,-50%) scale(1) rotate(-8deg)}
+.overlay{position:fixed;inset:0;z-index:40;background:rgba(10,10,9,.72);display:none;align-items:center;justify-content:center}.overlay.open{display:flex}.modal{width:min(400px,88vw);background:#211f1c;border:1px solid var(--line);padding:28px 26px 22px}.modal h2{font-size:15px;font-weight:400;margin-bottom:18px}.field{margin-bottom:14px}.field label{display:block;font:10px monospace;color:var(--muted);margin-bottom:6px}.field input{width:100%;padding:9px;background:#171614;border:1px solid var(--line);color:var(--paper);font:12px monospace}.actions{display:flex;justify-content:space-between;margin-top:20px}.btn{padding:9px 16px;cursor:pointer;border:1px solid var(--line);background:none;color:var(--muted)}.primary{background:var(--red);color:#f4ede4;border-color:var(--red)}
 </style>
 </head>
 <body>
-<div class="spine"><span class="dot"></span>縦書き</div>
-<button class="gear" id="gear" aria-label="設定" title="設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 1-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15 1.65 1.65 0 0 0 3.09 14H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9c-.23-.61-.82-1-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 3a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 9 6c.61-.23 1-.82 1-1.51V4a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 6c.61.23 1 .82 1.51 1H17a2 2 0 1 1 0 4h-.09A1.65 1.65 0 0 0 15 12c.23.61.82 1 1.51 1H17a2 2 0 1 1 0 4h-.09A1.65 1.65 0 0 0 15 18c-.61.23-1 .82-1 1.51V20a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 18a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 14c-.61.23-1 .82-1.51 1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 10c.23-.61.82-1 1.51-1H6a2 2 0 1 1 0-4z"/></svg></button>
+<button class="gear" id="gear" aria-label="設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 1-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15 1.65 1.65 0 0 0 3.09 14H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9c-.23-.61-.82-1-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 3a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 9 6c.61-.23 1-.82 1-1.51V4a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 6c.61.23 1 .82 1.51 1H17a2 2 0 1 1 0 4h-.09A1.65 1.65 0 0 0 15 12c.23.61.82 1 1.51 1H17a2 2 0 1 1 0 4h-.09A1.65 1.65 0 0 0 15 18c-.61.23-1 .82-1 1.51V20a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 18a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 14c-.61.23-1.51 1-1.51 1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 10c.23-.61.82-1 1.51-1H6a2 2 0 1 1 0-4z"/></svg></button>
 <div class="stage" id="stage"><div class="columns" id="columns"></div><div class="caret-guide" id="caretGuide"></div><textarea id="editor" aria-label="縦書き入力" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea></div>
-<div class="status"><div class="status-inner"><span class="count" id="count">0字</span><button class="save-hint" id="save">保存 ⌘↵</button></div></div>
-<div class="err"><div class="err-inner" id="err"></div></div><div class="stamp" id="stamp">禅</div>
-<div class="overlay" id="overlay"><div class="modal"><h2>縦書きモード設定</h2><div class="sub">ZEN NOTE v2v / VERTICAL</div><div class="field"><label>GitHub Token</label><input id="token" type="password" autocomplete="off" placeholder="github_pat_…"></div><div class="field"><label>Owner</label><input id="owner"></div><div class="field"><label>Repository</label><input id="repo"></div><div class="field"><label>Branch</label><input id="branch"></div><div class="field"><label>File path</label><input id="path"></div><div class="hint">{date} は今日の日付 (YYYY-MM-DD) に置換されます。</div><div class="actions"><button class="btn ghost" id="close">閉じる</button><button class="btn primary" id="apply">保存して閉じる</button></div></div></div>
+<div class="status"><div class="status-inner"><span id="count">0字</span><button class="save-hint" id="save">保存 ⌘↵</button></div></div><div class="err" id="err"></div><div class="stamp" id="stamp">禅</div>
+<div class="overlay" id="overlay"><div class="modal"><h2>縦書きモード設定</h2><div class="field"><label>GitHub Token</label><input id="token" type="password"></div><div class="field"><label>Owner</label><input id="owner"></div><div class="field"><label>Repository</label><input id="repo"></div><div class="field"><label>Branch</label><input id="branch"></div><div class="field"><label>File path</label><input id="path"></div><div class="actions"><button class="btn" id="close">閉じる</button><button class="btn primary" id="apply">保存して閉じる</button></div></div></div>
 <script>
-(function(){
-'use strict';
-var $=function(id){return document.getElementById(id);};
-var editor=$('editor'),stage=$('stage'),columns=$('columns');
-var KEY='zen-note-v2v-settings';
-var settings={token:'',owner:'plzsayyes3',repo:'mynotebook',branch:'main',path:'01Daily/{date}.md'};
-try{var old=JSON.parse(localStorage.getItem(KEY)||'{}');if(old&&typeof old==='object')Object.assign(settings,old);}catch(e){}
-function fill(){['token','owner','repo','branch','path'].forEach(function(k){$(k).value=settings[k]||'';});}
-function readSettings(){['token','owner','repo','branch','path'].forEach(function(k){settings[k]=$(k).value.trim();});localStorage.setItem(KEY,JSON.stringify(settings));}
-function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-function pathFor(){var p=settings.path.replaceAll('{date}',today());while(p.charAt(0)==='/')p=p.slice(1);return p;}
-function maxChars(){var step=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--step'))||36;return Math.max(5,Math.floor(stage.clientHeight/step));}
-function makeParts(text){var cap=maxChars(),out=[];text.split('\n').forEach(function(line){if(line.length===0){out.push('');return;}for(var i=0;i<line.length;i+=cap)out.push(line.slice(i,i+cap));});return out.length?out:[''];}
-function render(){
-  var ps=makeParts(editor.value),active=ps.length-1;
-  var col=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--col'))||30;
-  columns.innerHTML='';
-  ps.forEach(function(part,i){
-    var c=document.createElement('div');
-    c.className='column'+(i===active?' active':'')+(active-i>5?' faded':'');
-    c.style.left=(stage.clientWidth/2-col/2-(active-i)*col)+'px';
-    Array.from(part).forEach(function(ch){var s=document.createElement('span');s.className='ch';s.textContent=ch===' '?'　':ch;c.appendChild(s);});
-    columns.appendChild(c);
-  });
-  $('count').textContent=Array.from(editor.value).length+'字';
-}
-function focusEditor(){var n=editor.value.length;try{editor.focus({preventScroll:true});}catch(e){editor.focus();}try{editor.setSelectionRange(n,n);}catch(e){}}
-function showErr(msg){var e=$('err');e.textContent=msg;e.classList.add('show');clearTimeout(showErr.timer);showErr.timer=setTimeout(function(){e.classList.remove('show');},3500);}
-function encode64(s){return btoa(unescape(encodeURIComponent(s)));}
-function decode64(s){return decodeURIComponent(escape(atob(s.replace(/\n/g,''))));}
-async function api(path,opts){opts=opts||{};var url='https://api.github.com/repos/'+encodeURIComponent(settings.owner)+'/'+encodeURIComponent(settings.repo)+'/contents/'+path.split('/').map(encodeURIComponent).join('/');var headers={'Accept':'application/vnd.github+json','Authorization':'Bearer '+settings.token,'X-GitHub-Api-Version':'2022-11-28'};Object.assign(headers,opts.headers||{});var r=await fetch(url,Object.assign({},opts,{headers:headers}));if(!r.ok){var m='GitHub API '+r.status;try{var j=await r.json();m=j.message||m;}catch(e){}throw new Error(m);}return r.json();}
-async function load(){if(!settings.token)return;try{var j=await api(pathFor());if(j.content){editor.value=decode64(j.content);render();}}catch(e){if(e.message.indexOf('404')<0)showErr('読み込み: '+e.message);}}
-async function save(){if(!settings.token){$('overlay').classList.add('open');showErr('GitHub Tokenを設定してください');return;}$('save').disabled=true;try{var p=pathFor(),sha=null;try{sha=(await api(p)).sha;}catch(e){if(e.message.indexOf('404')<0)throw e;}var body={message:'zen-note v2v: save '+today(),content:encode64(editor.value),branch:settings.branch};if(sha)body.sha=sha;await api(p,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});var s=$('stamp');s.className='stamp on';clearTimeout(save.timer);save.timer=setTimeout(function(){s.className='stamp out';},800);}catch(e){showErr('保存: '+e.message);}finally{$('save').disabled=false;}}
-editor.addEventListener('focus',function(){document.body.classList.add('input-active');});
-editor.addEventListener('blur',function(){document.body.classList.remove('input-active');});
-editor.addEventListener('input',render);
-stage.addEventListener('pointerdown',function(){focusEditor();});
-editor.addEventListener('keydown',function(e){if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();save();}});
-$('save').addEventListener('click',save);
-$('gear').addEventListener('click',function(){$('overlay').classList.add('open');fill();});
-$('close').addEventListener('click',function(){$('overlay').classList.remove('open');});
-$('apply').addEventListener('click',function(){readSettings();$('overlay').classList.remove('open');load();focusEditor();});
-$('overlay').addEventListener('click',function(e){if(e.target===$('overlay'))$('overlay').classList.remove('open');});
-window.addEventListener('resize',render);
-fill();render();setTimeout(focusEditor,50);load();
+(function(){'use strict';
+var $=id=>document.getElementById(id),editor=$('editor'),stage=$('stage'),columns=$('columns'),guide=$('caretGuide');
+var KEY='zen-note-v2v-settings',settings={token:'',owner:'plzsayyes3',repo:'mynotebook',branch:'main',path:'01Daily/{date}.md'};
+try{Object.assign(settings,JSON.parse(localStorage.getItem(KEY)||'{}'));}catch(e){}
+function fill(){['token','owner','repo','branch','path'].forEach(k=>$(k).value=settings[k]||'')}
+function readSettings(){['token','owner','repo','branch','path'].forEach(k=>settings[k]=$(k).value.trim());localStorage.setItem(KEY,JSON.stringify(settings))}
+function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function pathFor(){return settings.path.replaceAll('{date}',today()).replace(/^\/+/, '')}
+function cap(){return Math.max(5,Math.floor((stage.clientHeight-48)/36))}
+function parts(text){var n=cap(),out=[];text.split('\n').forEach(line=>{if(!line)out.push('');else for(var i=0;i<line.length;i+=n)out.push(line.slice(i,i+n))});return out.length?out:['']}
+function render(){var ps=parts(editor.value),active=ps.length-1,col=30;columns.innerHTML='';ps.forEach((part,i)=>{var c=document.createElement('div');c.className='column '+(i===active?'active ':'')+(active-i>5?'faded':'');c.style.left=(stage.clientWidth/2-col/2-(active-i)*col)+'px';Array.from(part).forEach(ch=>{var s=document.createElement('span');s.className='ch';s.textContent=ch===' '?'　':ch;c.appendChild(s)});columns.appendChild(c)});var current=Array.from(ps[active]||'').length;guide.style.top=(24+Math.min(current,cap()-1)*36)+'px';$('count').textContent=Array.from(editor.value).length+'字'}
+function focusEnd(){editor.focus({preventScroll:true});var n=editor.value.length;editor.setSelectionRange(n,n)}
+function msg(t){$('err').textContent=t;clearTimeout(msg.t);msg.t=setTimeout(()=>$('err').textContent='',3500)}
+function enc(s){return btoa(unescape(encodeURIComponent(s)))}function dec(s){return decodeURIComponent(escape(atob(s.replace(/\n/g,''))))}
+async function api(p,o={}){var u='https://api.github.com/repos/'+encodeURIComponent(settings.owner)+'/'+encodeURIComponent(settings.repo)+'/contents/'+p.split('/').map(encodeURIComponent).join('/'),h={'Accept':'application/vnd.github+json','Authorization':'Bearer '+settings.token,'X-GitHub-Api-Version':'2022-11-28'};Object.assign(h,o.headers||{});var r=await fetch(u,Object.assign({},o,{headers:h}));if(!r.ok){var j={};try{j=await r.json()}catch(e){}throw Error(j.message||('GitHub API '+r.status))}return r.json()}
+async function load(){if(!settings.token)return;try{var j=await api(pathFor());if(j.content){editor.value=dec(j.content);render()}}catch(e){if(!e.message.includes('404'))msg('読み込み: '+e.message)}}
+async function save(){if(!settings.token){$('overlay').classList.add('open');return}$('save').disabled=true;try{var p=pathFor(),sha=null;try{sha=(await api(p)).sha}catch(e){if(!e.message.includes('404'))throw e}var b={message:'zen-note v2v: save '+today(),content:enc(editor.value),branch:settings.branch};if(sha)b.sha=sha;await api(p,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});$('stamp').className='stamp on';setTimeout(()=>$('stamp').className='stamp',800)}catch(e){msg('保存: '+e.message)}finally{$('save').disabled=false}}
+editor.addEventListener('input',render);editor.addEventListener('focus',()=>document.body.classList.add('input-active'));editor.addEventListener('blur',()=>document.body.classList.remove('input-active'));stage.addEventListener('pointerdown',focusEnd);editor.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();save()}});$('save').onclick=save;$('gear').onclick=()=>{$('overlay').classList.add('open');fill()};$('close').onclick=()=>$('overlay').classList.remove('open');$('apply').onclick=()=>{readSettings();$('overlay').classList.remove('open');load();focusEnd()};window.onresize=render;fill();render();setTimeout(focusEnd,50);load();
 })();
-</script>
-</body>
-</html>
+</script></body></html>
