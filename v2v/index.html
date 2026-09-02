@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <title>禅ノート v2 — 縦書き</title>
-<link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400&family=Zen+Old+Mincho:wght@400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
@@ -27,7 +27,7 @@
 </head>
 <body>
 <div class="spine"><span class="dot"></span>縦書き</div>
-<button class="gear" id="gear" aria-label="設定" title="設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15 1.65 1.65 0 0 0 3.09 14H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6 1.65 1.65 0 0 0 10.09 3H10a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l-.06-.06A1.65 1.65 0 1 0 18.83 2l-.06.06A1.65 1.65 0 0 0 15 4.6c-.61.23-1 .82-1 1.51V6a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 4.6 1.65 1.65 0 0 0 7.18 4.93l-.06-.06A2 2 0 1 1 4.29 7.7l.06.06A1.65 1.65 0 0 1 4.6 9c-.23.61-.82 1-1.51 1H3a2 2 0 1 0 0 4h.09c.69 0 1.28.39 1.51 1z"/></svg></button>
+<button class="gear" id="gear" aria-label="設定" title="設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 1-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15 1.65 1.65 0 0 0 3.09 14H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6 1.65 1.65 0 0 0 10.09 3H10a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0-1 1.51V6a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 4.6 1.65 1.65 0 0 0 7.18 4.93l-.06-.06A2 2 0 1 1 4.29 7.7l.06.06A1.65 1.65 0 0 0 4.6 9c-.23.61-.82 1-1.51 1H3a2 2 0 1 0 0 4h.09c.69 0 1.28.39 1.51 1z"/></svg></button>
 <div class="stage" id="stage"><div class="columns" id="columns"></div><div class="caret-guide" id="caretGuide"></div><textarea id="editor" aria-label="縦書き入力" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea></div>
 <div class="status"><div class="status-inner"><span class="count" id="count">0字</span><button class="save-hint" id="save">保存 ⌘↵</button></div></div>
 <div class="err"><div class="err-inner" id="err"></div></div><div class="stamp" id="stamp">禅</div>
@@ -55,16 +55,11 @@ function render(){
     var c=document.createElement('div');
     c.className='column'+(i===active?' active':'')+(active-i>5?' faded':'');
     c.style.left=(stage.clientWidth/2-col/2-(active-i)*col)+'px';
-    Array.from(part).forEach(function(ch){
-      var s=document.createElement('span');
-      s.className='ch';
-      s.textContent=ch===' '?'　':ch;
-      c.appendChild(s);
-    });
+    Array.from(part).forEach(function(ch){var s=document.createElement('span');s.className='ch';s.textContent=ch===' '?'　':ch;c.appendChild(s);});
     columns.appendChild(c);
   });
   var cap=maxChars();
-  var used=Array.from(ps[active]).length;
+  var used=Array.from(ps[active]||'').length;
   var row=Math.min(used,Math.max(0,cap-1));
   caretGuide.style.left='50%';
   caretGuide.style.top=(row*step+step/2)+'px';
