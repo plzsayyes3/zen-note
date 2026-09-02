@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
 <title>禅ノート v2 — 縦書き</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,8 +13,8 @@
 *{box-sizing:border-box;margin:0;padding:0}html,body{width:100%;height:100dvh}body{overflow:hidden;background:var(--bg);color:var(--paper);font-family:'Noto Serif JP','Zen Old Mincho',serif;-webkit-font-smoothing:antialiased}
 .stage{position:fixed;left:50%;top:50%;width:min(680px,86vw);height:min(78dvh,620px);transform:translate(-50%,-50%);overflow:hidden;mask-image:linear-gradient(to right,transparent,rgba(0,0,0,.2) 12%,rgba(0,0,0,.65) 30%,#000 45%,#000 55%,rgba(0,0,0,.65) 70%,rgba(0,0,0,.2) 88%,transparent);-webkit-mask-image:linear-gradient(to right,transparent,rgba(0,0,0,.2) 12%,rgba(0,0,0,.65) 30%,#000 45%,#000 55%,rgba(0,0,0,.65) 70%,rgba(0,0,0,.2) 88%,transparent)}
 .spine{position:fixed;left:24px;top:50%;transform:translateY(-50%);writing-mode:vertical-rl;letter-spacing:.5em;font-size:15px;color:var(--muted);opacity:.55;pointer-events:none}.dot{display:block;width:4px;height:4px;border-radius:50%;background:var(--red);margin:0 auto 14px}
-.columns{position:absolute;inset:0;pointer-events:none}.column{position:absolute;top:0;width:var(--col);height:100%;display:flex;flex-direction:column;align-items:center;font-size:19px;line-height:var(--step);font-weight:300;white-space:pre;overflow:hidden;opacity:.32;transition:opacity .12s}.column.active{opacity:1}.column.faded{opacity:.12}.ch{display:block;width:var(--col);height:var(--step);flex:0 0 var(--step);text-align:center}
-.caret-guide{position:absolute;left:50%;top:calc(var(--step) / 2);width:var(--col);height:var(--step);transform:translate(-50%,-50%);border:1.5px solid var(--red);border-radius:8px;background:rgba(178,58,46,.06);opacity:.18;pointer-events:none;z-index:2}.input-active .caret-guide{opacity:.95;animation:blink 1s steps(1,end) infinite}@keyframes blink{50%{opacity:.22}}
+.columns{position:absolute;inset:0;pointer-events:none}.column{position:absolute;top:0;width:var(--col);height:100%;display:flex;flex-direction:column;align-items:center;font-size:19px;line-height:var(--step);font-weight:300;white-space:pre;overflow:hidden;opacity:.32;transition:opacity .12s,top .08s}.column.active{opacity:1}.column.faded{opacity:.12}.ch{display:block;width:var(--col);height:var(--step);flex:0 0 var(--step);text-align:center}
+.caret-guide{position:absolute;left:50%;top:50%;width:var(--col);height:var(--step);transform:translate(-50%,-50%);border:1.5px solid var(--red);border-radius:8px;background:rgba(178,58,46,.06);opacity:.18;pointer-events:none;z-index:2}.input-active .caret-guide{opacity:.95;animation:blink 1s steps(1,end) infinite}@keyframes blink{50%{opacity:.22}}
 #editor{position:absolute;inset:0;width:100%;height:100%;z-index:3;padding:0;border:0;outline:0;resize:none;background:transparent;color:transparent;caret-color:transparent;font:16px/1 sans-serif;opacity:0;cursor:text;pointer-events:auto;-webkit-appearance:none}
 .gear{position:fixed;z-index:10;top:22px;right:26px;width:30px;height:30px;color:var(--muted);opacity:.35;cursor:pointer;background:none;border:0}.gear svg{width:17px;height:17px}
 .status{position:fixed;z-index:10;bottom:22px;left:0;right:0;display:flex;justify-content:center;pointer-events:none}.status-inner{width:min(680px,86vw);display:flex;justify-content:space-between;font:11px 'JetBrains Mono',monospace;color:var(--muted)}.save-hint{pointer-events:auto;cursor:pointer;opacity:.75;background:none;border:0;font:inherit;color:inherit}.count{opacity:.7}
@@ -27,7 +26,7 @@
 </head>
 <body>
 <div class="spine"><span class="dot"></span>縦書き</div>
-<button class="gear" id="gear" aria-label="設定" title="設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 1-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15 1.65 1.65 0 0 0 3.09 14H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6 1.65 1.65 0 0 0 10.09 3H10a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0-1 1.51V6a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 4.6 1.65 1.65 0 0 0 7.18 4.93l-.06-.06A2 2 0 1 1 4.29 7.7l.06.06A1.65 1.65 0 0 0 4.6 9c-.23.61-.82 1-1.51 1H3a2 2 0 1 0 0 4h.09c.69 0 1.28.39 1.51 1z"/></svg></button>
+<button class="gear" id="gear" aria-label="設定" title="設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82A1.65 1.65 0 0 0 3.09 14H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6 1.65 1.65 0 0 0 10.09 3H10a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82.33l-.06-.06A2 2 0 1 1 18.83 2l-.06.06A1.65 1.65 0 0 0 15 4.6c-.61.23-1 .82-1 1.51V6a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 4.6 1.65 1.65 0 0 0 7.18 4.93l-.06-.06A2 2 0 1 1 4.29 7.7l.06.06A1.65 1.65 0 0 0 4.6 9c-.23.61-.82 1-1.51 1H3a2 2 0 1 0 0 4h.09c.69 0 1.28.39 1.51 1z"/></svg></button>
 <div class="stage" id="stage"><div class="columns" id="columns"></div><div class="caret-guide" id="caretGuide"></div><textarea id="editor" aria-label="縦書き入力" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea></div>
 <div class="status"><div class="status-inner"><span class="count" id="count">0字</span><button class="save-hint" id="save">保存 ⌘↵</button></div></div>
 <div class="err"><div class="err-inner" id="err"></div></div><div class="stamp" id="stamp">禅</div>
@@ -50,19 +49,19 @@ function render(){
   var ps=makeParts(editor.value),active=ps.length-1;
   var col=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--col'))||30;
   var step=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--step'))||36;
+  var cursorY=stage.clientHeight/2;
   columns.innerHTML='';
   ps.forEach(function(part,i){
     var c=document.createElement('div');
     c.className='column'+(i===active?' active':'')+(active-i>5?' faded':'');
     c.style.left=(stage.clientWidth/2-col/2-(active-i)*col)+'px';
+    var used=Array.from(part).length;
+    c.style.top=(cursorY-(used*step+step/2))+'px';
     Array.from(part).forEach(function(ch){var s=document.createElement('span');s.className='ch';s.textContent=ch===' '?'　':ch;c.appendChild(s);});
     columns.appendChild(c);
   });
-  var cap=maxChars();
-  var used=Array.from(ps[active]||'').length;
-  var row=Math.min(used,Math.max(0,cap-1));
   caretGuide.style.left='50%';
-  caretGuide.style.top=(row*step+step/2)+'px';
+  caretGuide.style.top='50%';
   $('count').textContent=Array.from(editor.value).length+'字';
 }
 function focusEditor(){var n=editor.value.length;try{editor.focus({preventScroll:true});}catch(e){editor.focus();}try{editor.setSelectionRange(n,n);}catch(e){}}
