@@ -41,8 +41,16 @@ button,textarea,input{font:inherit}
   display:grid;grid-template-columns:28px minmax(0,1fr);
   align-items:start;
   padding-left:calc(var(--level) * 28px);
-  transition:padding-left .14s ease,opacity .14s ease;
+  transition:padding-left .14s ease,opacity .14s ease,background .14s ease;
+  border-radius:5px;
 }
+.item.selected{
+  background:rgba(178,58,46,.09);
+  box-shadow:inset 2px 0 0 var(--hanko);
+  outline:none;
+}
+.item.selected .bullet{color:var(--hanko)}
+.item.selected .text{border-bottom-color:transparent}
 .bullet{
   height:42px;border:0;background:none;color:var(--muted);padding:0;
   display:flex;align-items:center;justify-content:center;cursor:pointer;
@@ -125,7 +133,7 @@ button,textarea,input{font:inherit}
 
   <section class="intro">
     <h1>箇条書き</h1>
-    <p>一つずつ置く。順番はあとでいい。<br>Enterで次へ、Tabで一段深く。</p>
+    <p>一つずつ置く。順番はあとでいい。<br>Enterで次へ、Tabで一段深く。Escで行選択、Ctrl+↑↓で並べ替え。</p>
   </section>
 
   <main class="list" id="list" aria-label="箇条書きエディター"></main>
@@ -168,7 +176,7 @@ const DRAFT_KEY="zen:draft:v7:bullet";
 const MAX_LEVEL=3;
 const $=id=>document.getElementById(id);
 const list=$("list"), statusEl=$("status"), countEl=$("count"), saveBtn=$("saveBtn");
-let settings=null,items=[],activeId=null,draftTimer=null,isComposing=false,idSeq=0;
+let settings=null,items=[],activeId=null,selectedId=null,draftTimer=null,isComposing=false,idSeq=0;
 
 function uid(){return `i${Date.now().toString(36)}${(++idSeq).toString(36)}`}
 function blankItem(level=0){return {id:uid(),text:"",level:Math.max(0,Math.min(MAX_LEVEL,level))}}
@@ -222,11 +230,12 @@ function loadDraft(){
   }catch(e){}
   items=[blankItem()];activeId=items[0].id;
 }
-function render(focusId=null,caret=null){
+function render(focusId=null,caret=null,focusEditor=true){
   list.innerHTML="";
   items.forEach((item,index)=>{
     const row=document.createElement("div");
-    row.className="item";row.dataset.id=item.id;row.style.setProperty("--level",item.level);
+    row.className="item"+(selectedId===item.id?" selected":"");row.dataset.id=item.id;row.style.setProperty("--level",item.level);
+    row.tabIndex=selectedId===item.id?0:-1;row.setAttribute("aria-selected",selectedId===item.id?"true":"false");
     const bullet=document.createElement("button");
     bullet.className="bullet";bullet.type="button";bullet.textContent=bulletFor(item.level);
     bullet.title="タップで一段深く";
@@ -241,7 +250,11 @@ function render(focusId=null,caret=null){
     ta.className="text";ta.rows=1;ta.value=item.text;
     ta.placeholder=index===0?"書き始める……":"次の項目";
     ta.autocapitalize="sentences";ta.spellcheck=false;
-    ta.addEventListener("focus",()=>{activeId=item.id;updateToolbar()});
+    ta.addEventListener("focus",()=>{
+      activeId=item.id;
+      if(selectedId!==null){selectedId=null;document.querySelectorAll(".item.selected").forEach(el=>el.classList.remove("selected"))}
+      updateToolbar();
+    });
     ta.addEventListener("compositionstart",()=>{isComposing=true});
     ta.addEventListener("compositionend",()=>{isComposing=false;item.text=ta.value;autoSize(ta);scheduleDraftSave()});
     ta.addEventListener("input",()=>{
@@ -254,7 +267,7 @@ function render(focusId=null,caret=null){
   });
   updateCount();updateToolbar();
   const target=focusId||activeId;
-  if(target){
+  if(focusEditor&&target){
     requestAnimationFrame(()=>{
       const ta=list.querySelector(`[data-id="${CSS.escape(target)}"] .text`);
       if(!ta)return;
@@ -262,6 +275,13 @@ function render(focusId=null,caret=null){
       const p=caret==null?ta.value.length:Math.max(0,Math.min(caret,ta.value.length));
       ta.setSelectionRange(p,p);
       ta.scrollIntoView({block:"nearest",behavior:"smooth"});
+    });
+  }else if(selectedId){
+    requestAnimationFrame(()=>{
+      const row=list.querySelector(`[data-id="${CSS.escape(selectedId)}"]`);
+      if(!row)return;
+      row.focus({preventScroll:true});
+      row.scrollIntoView({block:"nearest",behavior:"smooth"});
     });
   }
 }
@@ -298,7 +318,44 @@ function indent(item,delta){
   item.level=Math.max(0,Math.min(MAX_LEVEL,item.level+delta));
   activeId=item.id;render(item.id);scheduleDraftSave();
 }
+function enterSelection(item,ta){
+  if(isComposing)return;
+  item.text=ta.value;activeId=item.id;selectedId=item.id;
+  render(null,null,false);scheduleDraftSave();setStatus("行選択");
+}
+function moveSelected(delta){
+  const i=itemIndex(selectedId);
+  if(i<0)return;
+  const j=i+delta;
+  if(j<0||j>=items.length)return;
+  [items[i],items[j]]=[items[j],items[i]];
+  activeId=selectedId;render(null,null,false);scheduleDraftSave();
+}
+function selectAdjacent(delta){
+  const i=itemIndex(selectedId);
+  if(i<0)return;
+  const j=Math.max(0,Math.min(items.length-1,i+delta));
+  if(j===i)return;
+  selectedId=items[j].id;activeId=selectedId;render(null,null,false);setStatus("行選択");
+}
+function editSelected(){
+  if(!selectedId)return;
+  const id=selectedId;selectedId=null;activeId=id;render(id);
+}
+function handleSelectionKeydown(e){
+  if(!selectedId)return;
+  if(e.ctrlKey&&!e.metaKey&&(e.key==="ArrowUp"||e.key==="ArrowDown")){
+    e.preventDefault();moveSelected(e.key==="ArrowUp"?-1:1);return;
+  }
+  if(!e.ctrlKey&&!e.metaKey&&e.key==="ArrowUp"){e.preventDefault();selectAdjacent(-1);return}
+  if(!e.ctrlKey&&!e.metaKey&&e.key==="ArrowDown"){e.preventDefault();selectAdjacent(1);return}
+  if(e.key==="Enter"){e.preventDefault();editSelected()}
+}
 function handleKeydown(e,item,ta){
+  if(e.key==="Escape"){
+    if(isComposing)return;
+    e.preventDefault();e.stopPropagation();enterSelection(item,ta);return;
+  }
   if((e.metaKey||e.ctrlKey)&&e.key==="Enter"){
     if(isComposing)return;e.preventDefault();doSave();return;
   }
@@ -435,6 +492,7 @@ $("outdentBtn").addEventListener("click",()=>{const i=itemIndex(activeId);if(i>=
 $("indentBtn").addEventListener("click",()=>{const i=itemIndex(activeId);if(i>=0)indent(items[i],1)});
 $("addBtn").addEventListener("click",addItem);
 saveBtn.addEventListener("click",doSave);
+document.addEventListener("keydown",handleSelectionKeydown);
 window.addEventListener("beforeunload",saveDraftNow);
 window.addEventListener("resize",()=>document.querySelectorAll(".text").forEach(autoSize));
 
