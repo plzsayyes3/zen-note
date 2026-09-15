@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="禅ノート 箇条書き">
+<title>禅ノート v7 - 箇条書き</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#1C1B19;--panel:#211F1C;--paper:#EAE4D8;--muted:#8C8577;
+  --hairline:#33312C;--hanko:#B23A2E;--hankoGlow:rgba(178,58,46,.16);
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--paper)}
+body{
+  font-family:'Noto Serif JP',serif;-webkit-font-smoothing:antialiased;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+button,textarea,input{font:inherit}
+.app{width:min(760px,100%);margin:auto;min-height:100dvh;padding:28px 18px 150px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:44px}
+.brand{font:11px 'JetBrains Mono',monospace;color:var(--muted);letter-spacing:.1em}
+.topActions{display:flex;align-items:center;gap:8px}
+.status{font:10px 'JetBrains Mono',monospace;color:var(--muted)}
+.gear{
+  width:34px;height:34px;border-radius:50%;border:1px solid var(--hairline);
+  background:none;color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer
+}
+.intro{margin:0 0 34px}
+.intro h1{font-size:24px;font-weight:400;letter-spacing:.08em;margin:0 0 8px}
+.intro p{font-size:12px;line-height:1.8;color:var(--muted);margin:0}
+.list{display:flex;flex-direction:column;gap:4px}
+.item{
+  --level:0;
+  display:grid;grid-template-columns:28px minmax(0,1fr);
+  align-items:start;
+  padding-left:calc(var(--level) * 28px);
+  transition:padding-left .14s ease,opacity .14s ease;
+}
+.bullet{
+  height:42px;border:0;background:none;color:var(--muted);padding:0;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  font-size:18px;line-height:1;
+}
+.item:focus-within .bullet{color:var(--hanko)}
+.text{
+  width:100%;min-height:42px;max-height:32vh;resize:none;overflow:hidden;
+  background:transparent;border:0;border-bottom:1px solid transparent;outline:none;
+  color:var(--paper);padding:8px 2px 7px;font-size:18px;font-weight:300;line-height:1.55;
+  caret-color:var(--hanko);
+}
+.text::placeholder{color:var(--muted);opacity:.45}
+.item:focus-within .text{border-bottom-color:var(--hairline)}
+.emptyHint{display:none;text-align:center;color:var(--muted);font-size:12px;padding:24px}
+.toolbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:10;
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+  background:rgba(28,27,25,.96);border-top:1px solid var(--hairline);backdrop-filter:blur(12px)
+}
+.toolbarInner{width:min(760px,100%);margin:auto;display:flex;gap:8px;align-items:center}
+.tool{
+  height:42px;min-width:42px;border:1px solid var(--hairline);border-radius:5px;
+  background:none;color:var(--muted);padding:0 12px;cursor:pointer;
+  font:12px 'JetBrains Mono',monospace
+}
+.tool:disabled{opacity:.3}
+.tool.primary{margin-left:auto;border-color:var(--hanko);color:var(--paper)}
+.meta{font:10px 'JetBrains Mono',monospace;color:var(--muted);margin-left:2px;white-space:nowrap}
+.overlay{
+  position:fixed;inset:0;background:rgba(10,10,9,.78);display:none;
+  align-items:center;justify-content:center;padding:18px;z-index:30
+}
+.overlay.open{display:flex}
+.modal{
+  width:min(430px,100%);max-height:88dvh;overflow:auto;background:var(--panel);
+  border:1px solid var(--hairline);border-radius:6px;padding:24px
+}
+.modal h2{font-size:17px;font-weight:400;margin:0 0 7px}
+.modal .sub{font:10px 'JetBrains Mono',monospace;color:var(--muted);line-height:1.6;margin-bottom:20px}
+.field{margin-bottom:13px}
+.field label{display:block;font:10px 'JetBrains Mono',monospace;color:var(--muted);margin-bottom:6px}
+.field input{
+  width:100%;background:#171614;border:1px solid var(--hairline);color:var(--paper);
+  padding:10px;border-radius:4px;outline:none;font:12px 'JetBrains Mono',monospace
+}
+.row{display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:18px}
+.btn{border:1px solid var(--hairline);background:none;color:var(--paper);padding:9px 13px;border-radius:4px;cursor:pointer;font-size:12px}
+.btn.primary{border-color:var(--hanko);background:var(--hanko)}
+.err{
+  position:fixed;left:50%;bottom:calc(72px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  max-width:min(680px,86vw);background:var(--hankoGlow);color:#d9968e;
+  font:11px 'JetBrains Mono',monospace;padding:7px 12px;border-radius:4px;
+  opacity:0;pointer-events:none;transition:opacity .2s
+}
+.err.show{opacity:1}
+.stamp{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.5) rotate(-8deg);
+  width:96px;height:96px;border:3px solid var(--hanko);border-radius:6px;color:var(--hanko);
+  display:flex;align-items:center;justify-content:center;font-size:40px;
+  opacity:0;pointer-events:none;transition:opacity .25s,transform .25s cubic-bezier(.2,1.4,.4,1)
+}
+.stamp.on{opacity:.92;transform:translate(-50%,-50%) scale(1) rotate(-8deg)}
+@media(max-width:560px){
+  .app{padding:22px 12px 145px}.top{margin-bottom:34px}.intro{padding:0 6px}
+  .intro h1{font-size:21px}.item{padding-left:calc(var(--level) * 20px)}
+  .text{font-size:17px}.status{display:none}.tool{padding:0 10px}.meta{display:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="brand">禅ノート v7 / BULLET</div>
+    <div class="topActions">
+      <span class="status" id="status">ローカル保存</span>
+      <button class="gear" id="gear" aria-label="設定">⚙</button>
+    </div>
+  </div>
+
+  <section class="intro">
+    <h1>箇条書き</h1>
+    <p>一つずつ置く。順番はあとでいい。<br>Enterで次へ、Tabで一段深く。</p>
+  </section>
+
+  <main class="list" id="list" aria-label="箇条書きエディター"></main>
+</div>
+
+<div class="toolbar">
+  <div class="toolbarInner">
+    <button class="tool" id="outdentBtn" title="一段戻す">←</button>
+    <button class="tool" id="indentBtn" title="一段深く">→</button>
+    <button class="tool" id="addBtn" title="項目を追加">＋</button>
+    <span class="meta" id="count">0項目</span>
+    <button class="tool primary" id="saveBtn">投稿</button>
+  </div>
+</div>
+
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
+    <h2>接続設定</h2>
+    <div class="sub">他の禅ノートと同じ GitHub 設定を共有します。</div>
+    <div class="field"><label>TOKEN</label><input id="f-token" type="password" autocomplete="off"></div>
+    <div class="field"><label>OWNER</label><input id="f-owner"></div>
+    <div class="field"><label>REPOSITORY</label><input id="f-repo"></div>
+    <div class="field"><label>BRANCH</label><input id="f-branch"></div>
+    <div class="field"><label>FOLDER</label><input id="f-folder"></div>
+    <div class="row">
+      <button class="btn" id="clearSettings">接続を解除</button>
+      <button class="btn primary" id="saveSettings">保存して閉じる</button>
+    </div>
+  </div>
+</div>
+
+<div class="err" id="err"></div>
+<div class="stamp" id="stamp">済</div>
+
+<script>
+"use strict";
+
+const DEFAULTS={owner:"plzsayyes3",repo:"mynotebook",branch:"main",folder:"00_inbox"};
+const DRAFT_KEY="zen:draft:v7:bullet";
+const MAX_LEVEL=3;
+const $=id=>document.getElementById(id);
+const list=$("list"), statusEl=$("status"), countEl=$("count"), saveBtn=$("saveBtn");
+let settings=null,items=[],activeId=null,draftTimer=null,isComposing=false,idSeq=0;
+
+function uid(){return `i${Date.now().toString(36)}${(++idSeq).toString(36)}`}
+function blankItem(level=0){return {id:uid(),text:"",level:Math.max(0,Math.min(MAX_LEVEL,level))}}
+function bulletFor(level){return ["•","◦","–","·"][Math.min(level,3)]}
+function itemIndex(id){return items.findIndex(x=>x.id===id)}
+function nonEmptyItems(){return items.filter(x=>x.text.trim())}
+function setStatus(text){statusEl.textContent=text}
+function showError(text){
+  const el=$("err");el.textContent=text;el.classList.add("show");
+  clearTimeout(showError.t);showError.t=setTimeout(()=>el.classList.remove("show"),4200)
+}
+function playStamp(){
+  const el=$("stamp");el.classList.add("on");setTimeout(()=>el.classList.remove("on"),900)
+}
+function autoSize(el){
+  el.style.height="0px";
+  el.style.height=Math.max(42,Math.min(el.scrollHeight,window.innerHeight*.32))+"px";
+  el.style.overflowY=el.scrollHeight>window.innerHeight*.32?"auto":"hidden";
+}
+function updateCount(){
+  const n=nonEmptyItems().length;
+  countEl.textContent=`${n}項目`;
+}
+function scheduleDraftSave(){
+  clearTimeout(draftTimer);
+  setStatus("保存中…");
+  draftTimer=setTimeout(saveDraftNow,500)
+}
+function saveDraftNow(){
+  try{
+    localStorage.setItem(DRAFT_KEY,JSON.stringify({items,activeId,updatedAt:Date.now()}));
+    setStatus("ローカル保存");
+  }catch(e){setStatus("保存失敗")}
+}
+function normalizeItems(raw){
+  if(!Array.isArray(raw)||!raw.length)return [blankItem()];
+  return raw.map(x=>({
+    id:typeof x.id==="string"&&x.id?x.id:uid(),
+    text:typeof x.text==="string"?x.text:"",
+    level:Number.isFinite(x.level)?Math.max(0,Math.min(MAX_LEVEL,x.level)):0
+  }));
+}
+function loadDraft(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(DRAFT_KEY)||"null");
+    if(raw&&Array.isArray(raw.items)){
+      items=normalizeItems(raw.items);
+      activeId=items.some(x=>x.id===raw.activeId)?raw.activeId:items[0].id;
+      return;
+    }
+  }catch(e){}
+  items=[blankItem()];activeId=items[0].id;
+}
+function render(focusId=null,caret=null){
+  list.innerHTML="";
+  items.forEach((item,index)=>{
+    const row=document.createElement("div");
+    row.className="item";row.dataset.id=item.id;row.style.setProperty("--level",item.level);
+    const bullet=document.createElement("button");
+    bullet.className="bullet";bullet.type="button";bullet.textContent=bulletFor(item.level);
+    bullet.title="タップで一段深く";
+    bullet.addEventListener("click",()=>{
+      activeId=item.id;
+      if(item.level<MAX_LEVEL)item.level++;
+      else item.level=0;
+      render(item.id);
+      scheduleDraftSave();
+    });
+    const ta=document.createElement("textarea");
+    ta.className="text";ta.rows=1;ta.value=item.text;
+    ta.placeholder=index===0?"書き始める……":"次の項目";
+    ta.autocapitalize="sentences";ta.spellcheck=false;
+    ta.addEventListener("focus",()=>{activeId=item.id;updateToolbar()});
+    ta.addEventListener("compositionstart",()=>{isComposing=true});
+    ta.addEventListener("compositionend",()=>{isComposing=false;item.text=ta.value;autoSize(ta);scheduleDraftSave()});
+    ta.addEventListener("input",()=>{
+      item.text=ta.value;autoSize(ta);updateCount();scheduleDraftSave();
+    });
+    ta.addEventListener("keydown",e=>handleKeydown(e,item,ta));
+    ta.addEventListener("paste",e=>handlePaste(e,item,ta));
+    row.append(bullet,ta);list.appendChild(row);
+    requestAnimationFrame(()=>autoSize(ta));
+  });
+  updateCount();updateToolbar();
+  const target=focusId||activeId;
+  if(target){
+    requestAnimationFrame(()=>{
+      const ta=list.querySelector(`[data-id="${CSS.escape(target)}"] .text`);
+      if(!ta)return;
+      ta.focus({preventScroll:true});
+      const p=caret==null?ta.value.length:Math.max(0,Math.min(caret,ta.value.length));
+      ta.setSelectionRange(p,p);
+      ta.scrollIntoView({block:"nearest",behavior:"smooth"});
+    });
+  }
+}
+function updateToolbar(){
+  const i=itemIndex(activeId);
+  const item=items[i];
+  $("outdentBtn").disabled=!item||item.level===0;
+  $("indentBtn").disabled=!item||item.level>=MAX_LEVEL;
+}
+function insertAfter(index,text="",level=null){
+  const base=items[index]||{level:0};
+  const item=blankItem(level==null?base.level:level);item.text=text;
+  items.splice(index+1,0,item);activeId=item.id;return item;
+}
+function splitItem(item,ta){
+  const i=itemIndex(item.id);if(i<0)return;
+  const start=ta.selectionStart??ta.value.length,end=ta.selectionEnd??start;
+  const before=ta.value.slice(0,start),after=ta.value.slice(end);
+  item.text=before;
+  const next=insertAfter(i,after,item.level);
+  render(next.id,0);scheduleDraftSave();
+}
+function removeOrMerge(item,ta){
+  const i=itemIndex(item.id);if(i<=0)return false;
+  const prev=items[i-1];
+  if(!item.text){
+    items.splice(i,1);activeId=prev.id;render(prev.id,prev.text.length);scheduleDraftSave();return true;
+  }
+  const joinAt=prev.text.length;
+  prev.text+=item.text;items.splice(i,1);activeId=prev.id;
+  render(prev.id,joinAt);scheduleDraftSave();return true;
+}
+function indent(item,delta){
+  item.level=Math.max(0,Math.min(MAX_LEVEL,item.level+delta));
+  activeId=item.id;render(item.id);scheduleDraftSave();
+}
+function handleKeydown(e,item,ta){
+  if((e.metaKey||e.ctrlKey)&&e.key==="Enter"){
+    if(isComposing)return;e.preventDefault();doSave();return;
+  }
+  if(e.key==="Enter"){
+    if(isComposing)return;e.preventDefault();
+    if(!item.text.trim()&&item.level>0){indent(item,-1);return}
+    splitItem(item,ta);return;
+  }
+  if(e.key==="Tab"){
+    e.preventDefault();indent(item,e.shiftKey?-1:1);return;
+  }
+  if(e.key==="Backspace"&&!isComposing&&ta.selectionStart===0&&ta.selectionEnd===0){
+    if(removeOrMerge(item,ta))e.preventDefault();
+  }
+}
+function parsePastedLines(text,baseLevel){
+  const lines=text.replace(/\r/g,"").split("\n");
+  return lines.filter((x,i)=>x.trim()||i===0).map(line=>{
+    const m=line.match(/^(\s*)[-*+]\s+(.*)$/);
+    if(m){
+      const extra=Math.min(MAX_LEVEL-baseLevel,Math.floor(m[1].replace(/\t/g,"  ").length/2));
+      return {text:m[2],level:Math.min(MAX_LEVEL,baseLevel+extra)};
+    }
+    return {text:line.trimEnd(),level:baseLevel};
+  });
+}
+function handlePaste(e,item,ta){
+  const text=e.clipboardData?.getData("text/plain")||"";
+  if(!text.includes("\n"))return;
+  e.preventDefault();
+  const i=itemIndex(item.id);if(i<0)return;
+  const start=ta.selectionStart??ta.value.length,end=ta.selectionEnd??start;
+  const before=ta.value.slice(0,start),after=ta.value.slice(end);
+  const parsed=parsePastedLines(text,item.level);
+  if(!parsed.length)return;
+  item.text=before+parsed[0].text;
+  const inserts=parsed.slice(1).map(x=>({id:uid(),text:x.text,level:x.level}));
+  if(after){
+    if(inserts.length)inserts[inserts.length-1].text+=after;
+    else item.text+=after;
+  }
+  items.splice(i+1,0,...inserts);
+  const target=inserts.length?inserts[inserts.length-1]:item;
+  activeId=target.id;render(target.id,target.text.length-(after?after.length:0));scheduleDraftSave();
+}
+function addItem(){
+  const i=itemIndex(activeId);
+  const next=insertAfter(i<0?items.length-1:i,"",i>=0?items[i].level:0);
+  render(next.id,0);scheduleDraftSave();
+}
+function markdown(){
+  return nonEmptyItems().map(x=>`${"  ".repeat(x.level)}- ${x.text.trim().replace(/\n+/g," ")}`).join("\n")+"\n";
+}
+function pad(n){return String(n).padStart(2,"0")}
+function timestampName(){
+  const d=new Date();
+  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+function b64EncodeUnicode(str){
+  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,(_,p)=>String.fromCharCode(parseInt(p,16))));
+}
+function loadSettings(){
+  try{settings=JSON.parse(localStorage.getItem("zen:settings:github")||"null")}catch(e){settings=null}
+}
+function openSettings(){
+  const s=settings||{};
+  $("f-token").value=s.token||"";
+  $("f-owner").value=s.owner||DEFAULTS.owner;
+  $("f-repo").value=s.repo||DEFAULTS.repo;
+  $("f-branch").value=s.branch||DEFAULTS.branch;
+  $("f-folder").value=s.folder||DEFAULTS.folder;
+  $("settingsOverlay").classList.add("open");
+}
+function saveSettings(){
+  settings={
+    token:$("f-token").value.trim(),
+    owner:$("f-owner").value.trim()||DEFAULTS.owner,
+    repo:$("f-repo").value.trim()||DEFAULTS.repo,
+    branch:$("f-branch").value.trim()||DEFAULTS.branch,
+    folder:($("f-folder").value.trim()||DEFAULTS.folder).replace(/^\/+|\/+$/g,"")
+  };
+  try{localStorage.setItem("zen:settings:github",JSON.stringify(settings))}catch(e){}
+  $("settingsOverlay").classList.remove("open");
+}
+function clearSettings(){
+  try{localStorage.removeItem("zen:settings:github")}catch(e){}
+  settings=null;$("settingsOverlay").classList.remove("open");
+}
+async function doSave(){
+  const body=markdown();
+  if(!body.trim()){showError("保存する項目がありません");return}
+  if(!settings||!settings.token||!settings.owner||!settings.repo){
+    openSettings();showError("先に接続設定を入力してください");return;
+  }
+  saveDraftNow();saveBtn.disabled=true;saveBtn.textContent="投稿中…";setStatus("GitHubへ投稿中");
+  const name=timestampName(),path=`${settings.folder}/${name}.md`;
+  const first=nonEmptyItems()[0]?.text.trim()||name;
+  const api=`https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${path}`;
+  const options={
+    method:"PUT",
+    headers:{
+      "Authorization":`Bearer ${settings.token}`,
+      "Accept":"application/vnd.github+json",
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({
+      message:`Zen bullet: ${first.slice(0,40)}`,
+      content:b64EncodeUnicode(body),
+      branch:settings.branch||"main"
+    })
+  };
+  try{
+    let res=await fetch(api,options);
+    if(res.status===401){await new Promise(r=>setTimeout(r,1000));res=await fetch(api,options)}
+    if(!res.ok){
+      const data=await res.json().catch(()=>({}));
+      throw new Error(data.message||`GitHub API error (${res.status})`);
+    }
+    try{localStorage.removeItem(DRAFT_KEY)}catch(e){}
+    items=[blankItem()];activeId=items[0].id;render(activeId,0);playStamp();setStatus("投稿済み");
+    setTimeout(()=>setStatus("ローカル保存"),1600);
+  }catch(e){
+    showError("投稿に失敗しました: "+e.message);setStatus("投稿失敗");
+  }finally{
+    saveBtn.disabled=false;saveBtn.textContent="投稿";
+  }
+}
+
+$("gear").addEventListener("click",openSettings);
+$("saveSettings").addEventListener("click",saveSettings);
+$("clearSettings").addEventListener("click",clearSettings);
+$("settingsOverlay").addEventListener("click",e=>{if(e.target===$("settingsOverlay"))$("settingsOverlay").classList.remove("open")});
+$("outdentBtn").addEventListener("click",()=>{const i=itemIndex(activeId);if(i>=0)indent(items[i],-1)});
+$("indentBtn").addEventListener("click",()=>{const i=itemIndex(activeId);if(i>=0)indent(items[i],1)});
+$("addBtn").addEventListener("click",addItem);
+saveBtn.addEventListener("click",doSave);
+window.addEventListener("beforeunload",saveDraftNow);
+window.addEventListener("resize",()=>document.querySelectorAll(".text").forEach(autoSize));
+
+(function init(){
+  loadSettings();loadDraft();render(activeId,0);
+  if(!settings)setTimeout(openSettings,350);
+})();
+</script>
+</body>
+</html>
