@@ -13,6 +13,9 @@
 | v2v | [/v2v/](https://plzsayyes3.github.io/zen-note/v2v/) | v2の派生「縦書きモード」。カーソルを画面中央に固定し、文字は上から下へ流れ、列が埋まると左へ進む。GitHubへの読み込み・保存に対応。 |
 | v3 | [/v3/](https://plzsayyes3.github.io/zen-note/v3/) | v2 + AI漢字変換。ローマ字/ひらがなのまま直接入力し（IME変換は経由しない設計）、投稿前にGemini APIで自然な漢字混じり表記に自動変換してからGitHubへ投稿する。 |
 | v4 | [/v4/](https://plzsayyes3.github.io/zen-note/v4/) | 「自転車モード」。走行中の音声入力に特化。iOS標準ディクテーションで話した内容が末尾に自動で積み上がるログ形式で、文中カーソル位置合わせは不要。画面はキーボードより上だけで完結し、屋外視認性を優先したライトモードが既定（ダークにも切替可）。発話は無音1.6秒で自動確定し、数秒後にGitHubへ自動保存。走行中は設定を求めない・保存に失敗してもローカルの下書きは消えず、電波復帰時に自動再送する。 |
+| v5 | [/v5/](https://plzsayyes3.github.io/zen-note/v5/) | 改行も列送りもない一本の縦書きストリーム。現在位置を中央付近に保ちながら、過去の文字が上へ流れる。 |
+| v6 | [/v6/](https://plzsayyes3.github.io/zen-note/v6/) | 「コンバットノート」。Geminiが短い反応と問いを1つだけ返す対話型ノート。対話終了後にMarkdownとしてGitHubへ保存する。 |
+| v7 | [/v7/](https://plzsayyes3.github.io/zen-note/v7/) | 「箇条書きモード」。1項目ずつ入力し、Enterで次項目、Tab / Shift+Tabまたは画面ボタンで階層化。保存時はMarkdownの箇条書きとしてInboxへ投稿する。 |
 
 いずれも対象は `plzsayyes3/mynotebook` を既定値とし、GitHub Token・保存先は各モードの設定画面から変更可能。
 
@@ -21,8 +24,9 @@
 - 完全に静的（サーバー・ビルドステップなし）。GitHub Pagesでそのままホスティング。
 - 認証は GitHub の Fine-grained Personal Access Token をブラウザに貼り付ける方式。トークンは `localStorage` に保存し、GitHub API以外へ送信しない。
 - ファイルの読み書きはブラウザから `api.github.com` に直接アクセス。
-- v3のAI変換は Google Gemini API を直接ブラウザから呼び出す。APIキーも `localStorage` に保存。
+- v3 / v6 のAI機能は Google Gemini API を直接ブラウザから呼び出す。APIキーも `localStorage` に保存。
 - v2vはv2の操作思想を引き継ぎつつ、描画部分を縦書き用に分離。論理テキストは通常のMarkdown文字列のまま保持し、表示時だけ縦方向の列へ分割する。
+- v7は表示上の箇条書き項目を配列としてローカル保存し、GitHub投稿時にインデント付きMarkdownへ変換する。
 
 ## セットアップ
 
@@ -33,7 +37,7 @@ https://github.com/settings/personal-access-tokens/new
 - Repository access: 対象リポジトリ（例: `mynotebook`）のみ
 - Permissions: Contents = **Read and write**
 
-### 2. (v3のみ) Gemini API Key
+### 2. (v3 / v6のみ) Gemini API Key
 
 https://aistudio.google.com/apikey で発行。
 
@@ -43,7 +47,7 @@ https://aistudio.google.com/apikey で発行。
 
 ### 3. スマホで開く
 
-各バージョンのURLを開き、設定画面（歯車アイコン、またはv3ならステータスバーの「設定」ボタン）からトークンを貼り付ける。「ホーム画面に追加」するとアプリのように使える。
+各バージョンのURLを開き、設定画面からトークンを貼り付ける。「ホーム画面に追加」するとアプリのように使える。
 
 ## 開発メモ
 
@@ -52,3 +56,4 @@ https://aistudio.google.com/apikey で発行。
 - v2vの日本語表示は `writing-mode: vertical-rl` と `text-orientation: mixed` を使用。日本語だけでなく英数字も入力値を壊さず保持する。
 - v3の「ひらがな・英数字直打ち」は、IME変換候補UI自体を無効化するWeb APIが存在しないため、`compositionend`時に漢字・カタカナが紛れ込んでいたら検知して取り除く方式。加えて `lang="en"` 指定でiOS Safariに英語キーボードを優先させ、ローマ字のまま入力できるようにしている（Gemini側でローマ字→自然な日本語への変換も行う）。
 - v4は、Safari(iOS)がWeb Speech API(`SpeechRecognition`)を実装していないため、音声認識自体はOS標準キーボードのディクテーション機能に依存する設計。「キーボードが出ること」自体は避けられないので、代わりに `visualViewport` の `height`/`offsetTop` を毎回 `#app` の高さ/位置に反映し、キーボードが出てもその上の可視領域だけでレイアウトが完結するようにしている。入力欄はカーソル位置合わせが不要な追記オンリーのログ形式（無音1.6秒で1行確定）にすることで、暗い画面でカーソルを探す操作自体をなくしている。GitHubへの保存は行確定のたびに即localStorageへ退避した上でデバウンスしてPUTし、走行中に接続設定モーダルを自動で開くことはしない（未設定/オフライン時はローカル下書きを保持し続け、`online`イベントで自動再送）。
+- v7は各項目を独立した`textarea`として扱う。Enterで現在位置を分割して次項目を作り、Backspaceで前項目へ結合、Tab / Shift+Tabで最大3段までインデントする。iPhone / iPad向けに画面下部にもインデント操作を置いている。複数行ペーストは項目へ分割し、Markdownリストなら可能な範囲で階層も復元する。
