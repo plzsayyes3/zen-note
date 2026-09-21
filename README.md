@@ -16,6 +16,7 @@
 | v5 | [/v5/](https://plzsayyes3.github.io/zen-note/v5/) | 改行も列送りもない一本の縦書きストリーム。現在位置を中央付近に保ちながら、過去の文字が上へ流れる。 |
 | v6 | [/v6/](https://plzsayyes3.github.io/zen-note/v6/) | 「コンバットノート」。Geminiが短い反応と問いを1つだけ返す対話型ノート。対話終了後にMarkdownとしてGitHubへ保存する。 |
 | v7 | [/v7/](https://plzsayyes3.github.io/zen-note/v7/) | 「箇条書きモード」。1項目ずつ入力し、Enterで次項目、Tab / Shift+Tabまたは画面ボタンで階層化。保存時はMarkdownの箇条書きとしてInboxへ投稿する。 |
+| v8 | [/v8/](https://plzsayyes3.github.io/zen-note/v8/) | 「思考グラフ」。Graph / Text / Cameraを分離し、キーボード中心でノード作成・選択・接続・Zoom / Panを行う。Markdown + UID + hidden edgesとしてInboxへ保存する。 |
 
 いずれも対象は `plzsayyes3/mynotebook` を既定値とし、GitHub Token・保存先は各モードの設定画面から変更可能。
 
@@ -57,3 +58,5 @@ https://aistudio.google.com/apikey で発行。
 - v3の「ひらがな・英数字直打ち」は、IME変換候補UI自体を無効化するWeb APIが存在しないため、`compositionend`時に漢字・カタカナが紛れ込んでいたら検知して取り除く方式。加えて `lang="en"` 指定でiOS Safariに英語キーボードを優先させ、ローマ字のまま入力できるようにしている（Gemini側でローマ字→自然な日本語への変換も行う）。
 - v4は、Safari(iOS)がWeb Speech API(`SpeechRecognition`)を実装していないため、音声認識自体はOS標準キーボードのディクテーション機能に依存する設計。「キーボードが出ること」自体は避けられないので、代わりに `visualViewport` の `height`/`offsetTop` を毎回 `#app` の高さ/位置に反映し、キーボードが出てもその上の可視領域だけでレイアウトが完結するようにしている。入力欄はカーソル位置合わせが不要な追記オンリーのログ形式（無音1.6秒で1行確定）にすることで、暗い画面でカーソルを探す操作自体をなくしている。GitHubへの保存は行確定のたびに即localStorageへ退避した上でデバウンスしてPUTし、走行中に接続設定モーダルを自動で開くことはしない（未設定/オフライン時はローカル下書きを保持し続け、`online`イベントで自動再送）。
 - v7は各項目を独立した`textarea`として扱う。Enterで現在位置を分割して次項目を作り、Backspaceで前項目へ結合、Tab / Shift+Tabで最大3段までインデントする。iPhone / iPad向けに画面下部にもインデント操作を置いている。複数行ペーストは項目へ分割し、Markdownリストなら可能な範囲で階層も復元する。
+
+- v8はGraph / Text / Cameraの3状態を分離。Graphでは `S` で画面内Hintから選択、`L` で接続先を選び、`L` の後に `N` で選択ノードから新規ノードを右側へ作る。`N` 単独は独立ノード、`E` は編集、`X` は削除、`Ctrl+Z` はUndo。Cameraでは WASD / HJKL、Zoomは `zi` / `zo`、選択ノード中心は `zfi` / `zfo`、全体表示は `za`。ノード座標はなるべく固定し、Camera移動で認知上の大移動を避ける。
