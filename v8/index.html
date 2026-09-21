@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="禅ノート Graph">
+<title>禅ノート v8 - Thought Graph</title>
+<style>
+:root{
+  --bg:#f7f7f5;--paper:#fff;--ink:#17191d;--muted:#858a93;--line:#c8ccd3;
+  --hair:#e2e4e8;--blue:#4f8cff;--blueSoft:rgba(79,140,255,.10);--shadow:0 14px 40px rgba(28,34,45,.08);
+}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic UI",sans-serif;-webkit-font-smoothing:antialiased}
+button,textarea,input{font:inherit}
+button{touch-action:manipulation}
+#app{position:fixed;inset:0;background:var(--bg);overflow:hidden}
+.topbar{position:absolute;left:0;right:0;top:0;height:64px;z-index:30;display:flex;align-items:center;justify-content:space-between;padding:10px 18px;padding-top:calc(10px + env(safe-area-inset-top));pointer-events:none}
+.brand{pointer-events:auto}.brandTitle{font-size:15px;letter-spacing:.06em;font-weight:600}.brandSub{font-size:10px;color:var(--muted);margin-top:3px;letter-spacing:.08em}
+.modebar{pointer-events:auto;display:flex;align-items:center;gap:4px;padding:4px;border:1px solid var(--hair);background:rgba(247,247,245,.86);backdrop-filter:blur(14px);border-radius:999px;box-shadow:0 8px 28px rgba(30,35,44,.05)}
+.mode{border:0;background:transparent;color:#9a9ea6;font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;padding:8px 12px;border-radius:999px}.mode.on{background:#fff;color:#202329;box-shadow:0 2px 9px rgba(20,25,35,.08)}
+.actions{pointer-events:auto;display:flex;gap:6px}.iconBtn{height:36px;min-width:36px;padding:0 11px;border:1px solid var(--hair);border-radius:12px;background:rgba(255,255,255,.88);color:#626771;cursor:pointer}.iconBtn.primary{color:#1f56b5;border-color:#bcd0ff;background:#f7faff}
+.canvas{position:absolute;inset:0;overflow:hidden;touch-action:none;cursor:default}
+.canvas.camera{cursor:grab}.canvas.camera.dragging{cursor:grabbing}
+.world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+.edges{position:absolute;left:-10000px;top:-10000px;width:20000px;height:20000px;overflow:visible;pointer-events:none}
+.edges line{stroke:var(--line);stroke-width:1.55;vector-effect:non-scaling-stroke}
+.nodes{position:absolute;left:0;top:0}
+.node{position:absolute;width:250px;min-height:82px;transform:translate(-50%,-50%);padding:16px 18px 15px;border:1px solid var(--hair);border-radius:18px;background:rgba(255,255,255,.95);box-shadow:0 10px 30px rgba(25,31,41,.045);transition:border-color .16s,box-shadow .16s,opacity .16s,transform .16s;user-select:none;cursor:pointer}
+.node.dim{opacity:.78}.node.selected{border-color:var(--blue);box-shadow:0 0 0 3px var(--blueSoft),var(--shadow);z-index:4;transform:translate(-50%,-50%) scale(1.025)}
+.nodeText{font-size:16px;line-height:1.55;font-weight:560;white-space:pre-wrap;overflow-wrap:anywhere}.nodeMeta{margin-top:8px;font:9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#a4a8af;letter-spacing:.08em}
+.hint{position:absolute;left:-10px;top:-10px;min-width:26px;height:26px;padding:0 6px;border-radius:9px;background:#22262c;color:white;display:none;place-items:center;font:800 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;box-shadow:0 5px 16px rgba(20,25,35,.16);z-index:8}
+.hints .hint{display:grid}.hintTarget .hint{background:var(--blue)}
+.editor{width:100%;min-height:54px;max-height:210px;resize:none;border:0;outline:0;background:transparent;color:var(--ink);font-size:16px;line-height:1.55;font-weight:560;padding:0;overflow:auto;caret-color:var(--blue);user-select:text}
+.cross{position:absolute;width:26px;height:26px;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;opacity:0;transition:opacity .16s;z-index:15}.cameraMode .cross{opacity:.22}.cross:before,.cross:after{content:"";position:absolute;background:#4b5059}.cross:before{left:12px;top:0;width:1px;height:26px}.cross:after{left:0;top:12px;width:26px;height:1px}
+.toast{position:absolute;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:40;background:rgba(23,25,29,.92);color:#fff;padding:8px 12px;border-radius:999px;font:10px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;opacity:0;pointer-events:none;transition:opacity .15s;white-space:nowrap}.toast.on{opacity:1}
+.help{position:absolute;left:18px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:20;font:10px/1.8 ui-monospace,SFMono-Regular,Menlo,monospace;color:#a1a5ad;pointer-events:none}.help b{color:#60656e;font-weight:650}
+.zoomBadge{position:absolute;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:20;display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--hair);background:rgba(255,255,255,.88);border-radius:12px;color:#777c85;font:10px/1 ui-monospace,SFMono-Regular,Menlo,monospace}.zoomBadge button{border:0;background:none;color:#60656e;padding:0 3px;cursor:pointer}
+.overlay{position:fixed;inset:0;background:rgba(30,32,36,.30);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:18px;z-index:60}.overlay.open{display:flex}
+.modal{width:min(430px,100%);max-height:88dvh;overflow:auto;background:#fff;border:1px solid var(--hair);border-radius:18px;padding:22px;box-shadow:0 24px 80px rgba(20,25,35,.18)}.modal h2{font-size:17px;margin:0 0 5px}.modal .sub{font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:18px}.field{margin:12px 0}.field label{display:block;font:9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#8f949d;letter-spacing:.08em;margin-bottom:6px}.field input{width:100%;border:1px solid var(--hair);border-radius:10px;padding:10px 11px;outline:none;background:#fafafa;color:var(--ink);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.row{display:flex;justify-content:space-between;gap:8px;margin-top:18px}.btn{border:1px solid var(--hair);background:#fff;color:#444951;border-radius:10px;padding:9px 12px;cursor:pointer}.btn.primary{background:#2468e8;color:#fff;border-color:#2468e8}
+@media(max-width:700px){.topbar{height:58px;padding-left:12px;padding-right:12px}.brandSub{display:none}.brandTitle{font-size:13px}.mode{padding:7px 8px;font-size:9px}.actions .iconBtn:not(.primary){display:none}.node{width:210px;padding:14px 15px;border-radius:16px}.nodeText,.editor{font-size:15px}.help{display:none}.zoomBadge{right:10px;bottom:calc(10px + env(safe-area-inset-bottom))}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="brand"><div class="brandTitle">思考を、つなげる</div><div class="brandSub">ZEN NOTE v8 / THOUGHT GRAPH</div></div>
+    <div class="modebar"><span class="mode on" data-mode="graph">GRAPH</span><span class="mode" data-mode="text">TEXT</span><span class="mode" data-mode="camera">CAMERA</span></div>
+    <div class="actions"><button class="iconBtn" id="allBtn" title="全体表示">ALL</button><button class="iconBtn" id="gearBtn" title="設定">⚙</button><button class="iconBtn primary" id="saveBtn">投稿</button></div>
+  </div>
+  <div class="canvas" id="canvas">
+    <div class="world" id="world"><svg class="edges" id="edges" viewBox
