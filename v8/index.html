@@ -89,15 +89,27 @@ function pushHistory(){history.push(cloneState());if(history.length>80)history.s
 function restoreState(s){nodes=s.nodes;edges=s.edges;selectedId=s.selectedId;pending=null;hints.clear();render()}
 function undo(){if(!history.length)return;redoStack.push(cloneState());restoreState(history.pop());saveDraftSoon();toast("UNDO")}
 function redo(){if(!redoStack.length)return;history.push(cloneState());restoreState(redoStack.pop());saveDraftSoon();toast("REDO")}
-function toast(t){toastEl.textContent=t;toastEl.classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove("on"),1000)}
+function toast(t,ms=1000){toastEl.textContent=t;toastEl.classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove("on"),ms)}
 function setMode(next){mode=next;app.classList.toggle("cameraMode",mode==="camera");canvas.classList.toggle("camera",mode==="camera");document.querySelectorAll(".mode").forEach(x=>x.classList.toggle("on",x.dataset.mode===mode))}
 function worldToScreen(x,y){return {x:x*camera.scale+camera.x,y:y*camera.scale+camera.y}}
 function screenToWorld(x,y){return {x:(x-camera.x)/camera.scale,y:(y-camera.y)/camera.scale}}
 function applyCamera(){world.style.transform=`translate(${camera.x}px,${camera.y}px) scale(${camera.scale})`;$("zoomLabel").textContent=Math.round(camera.scale*100)+"%"}
 function visibleNodes(){return nodes.filter(n=>{const p=worldToScreen(n.x,n.y);const w=NODE_W*camera.scale/2,h=NODE_H*camera.scale/2;return p.x+w>=0&&p.x-w<=innerWidth&&p.y+h>=0&&p.y-h<=innerHeight})}
 function hintCodes(count){const out=[];for(const c of HINT_CHARS)out.push(c);if(count<=out.length)return out.slice(0,count);for(const a of HINT_CHARS)for(const b of HINT_CHARS)out.push(a+b);return out.slice(0,count)}
-function showHints(kind){const list=visibleNodes().filter(n=>kind!=="link"||n.id!==selectedId);const codes=hintCodes(list.length);hints.clear();list.forEach((n,i)=>hints.set(codes[i],n.id));pending={type:kind,buffer:""};render();toast(kind==="select"?"SELECT":"LINK")}
+function showHints(kind){const list=visibleNodes().filter(n=>kind!=="link"||n.id!==selectedId);const codes=hintCodes(list.length);hints.clear();list.forEach((n,i)=>hints.set(codes[i],n.id));pending={type:kind,buffer:""};refreshNodeChrome();toast(kind==="select"?"SELECT":"LINK")}
 function hintForNode(id){for(const [code,nid] of hints)if(nid===id)return code;return ""}
+function refreshNodeChrome(){
+  const hintMode=!!pending&&(pending.type==="select"||pending.type==="link");
+  nodesEl.querySelectorAll(".node").forEach(el=>{
+    const id=el.dataset.id;
+    el.classList.toggle("selected",selectedId===id);
+    el.classList.toggle("dim",!!selectedId&&selectedId!==id);
+    el.classList.toggle("hints",hintMode);
+    el.classList.toggle("hintTarget",pending?.type==="link");
+    const hint=el.querySelector(".hint");
+    if(hint)hint.textContent=hintForNode(id).toUpperCase();
+  })
+}
 function render(){
   nodesEl.innerHTML="";edgesEl.innerHTML="";
   edges.forEach(e=>{const a=nodeById(e.a),b=nodeById(e.b);if(!a||!b)return;const line=document.createElementNS("http://www.w3.org/2000/svg","line");line.setAttribute("x1",a.x);line.setAttribute("y1",a.y);line.setAttribute("x2",b.x);line.setAttribute("y2",b.y);edgesEl.appendChild(line)});
@@ -105,14 +117,14 @@ function render(){
   nodes.forEach(n=>{
     const el=document.createElement("div");el.className="node"+(selectedId===n.id?" selected":"")+(selectedId&&selectedId!==n.id?" dim":"")+(hintMode?" hints":"")+(pending?.type==="link"?" hintTarget":"");el.dataset.id=n.id;el.style.left=n.x+"px";el.style.top=n.y+"px";
     const hint=document.createElement("span");hint.className="hint";hint.textContent=hintForNode(n.id).toUpperCase();el.appendChild(hint);
-    if(editorState?.id===n.id){const ta=document.createElement("textarea");ta.className="editor";ta.value=editorState.text;ta.rows=2;ta.addEventListener("compositionstart",()=>isComposing=true);ta.addEventListener("compositionend",()=>isComposing=false);ta.addEventListener("input",()=>{editorState.text=ta.value;autoSize(ta)});ta.addEventListener("keydown",e=>handleEditorKey(e,ta));el.appendChild(ta);requestAnimationFrame(()=>{ta.focus();autoSize(ta);ta.setSelectionRange(ta.value.length,ta.value.length)})}
+    if(editorState?.id===n.id){const ta=document.createElement("textarea");ta.className="editor";ta.value=editorState.text;ta.rows=2;ta.addEventListener("compositionstart",()=>isComposing=true);ta.addEventListener("compositionend",()=>{isComposing=false;editorState.text=ta.value;saveDraftSoon()});ta.addEventListener("input",()=>{editorState.text=ta.value;autoSize(ta);saveDraftSoon()});ta.addEventListener("keydown",e=>handleEditorKey(e,ta));el.appendChild(ta);requestAnimationFrame(()=>{ta.focus();autoSize(ta);ta.setSelectionRange(ta.value.length,ta.value.length)})}
     else{const text=document.createElement("div");text.className="nodeText";text.textContent=n.text;const meta=document.createElement("div");meta.className="nodeMeta";meta.textContent="^"+n.id;el.append(text,meta)}
-    el.addEventListener("click",ev=>{if(mode==="text")return;ev.stopPropagation();selectedId=n.id;pending=null;hints.clear();setMode("graph");render();saveDraftSoon()});nodesEl.appendChild(el)
+    el.addEventListener("click",ev=>{if(mode==="text")return;ev.stopPropagation();selectedId=n.id;pending=null;hints.clear();setMode("graph");refreshNodeChrome();saveDraftSoon()});nodesEl.appendChild(el)
   });
   applyCamera();
 }
 function autoSize(ta){ta.style.height="0px";ta.style.height=Math.min(210,Math.max(54,ta.scrollHeight))+"px"}
-function startText(id,{isNew=false,previous=""}={}){const n=nodeById(id);if(!n)return;pending=null;hints.clear();selectedId=id;editorState={id,text:n.text,isNew,previous};setMode("text");render()}
+function startText(id,{isNew=false,previous=""}={}){const n=nodeById(id);if(!n)return;pending=null;hints.clear();selectedId=id;editorState={id,text:n.text,isNew,previous};setMode("text");render();saveDraftSoon();requestAnimationFrame(keepEditorVisible)}
 function finishText(commit){
   if(!editorState)return;
   const st=editorState,n=nodeById(st.id);
@@ -178,7 +190,7 @@ function zoomBy(factor,focusId=null){const from={...camera};const old=camera.sca
 function zoomAroundScreen(factor,sx,sy){const wp=screenToWorld(sx,sy),next=Math.max(.18,Math.min(3.2,camera.scale*factor));camera.scale=next;camera.x=sx-wp.x*next;camera.y=sy-wp.y*next;applyCamera();saveDraftSoon()}
 function animateCamera(from){const start=from||{...camera};const fromT=`translate(${start.x}px,${start.y}px) scale(${start.scale})`,toT=`translate(${camera.x}px,${camera.y}px) scale(${camera.scale})`;world.getAnimations().forEach(a=>a.cancel());world.animate([{transform:fromT},{transform:toT}],{duration:180,easing:"cubic-bezier(.2,.8,.2,1)"});applyCamera();saveDraftSoon()}
 function pan(dx,dy){camera.x+=dx;camera.y+=dy;applyCamera();saveDraftSoon()}
-function handleHintKey(key){if(!pending)return false;if(key==="Escape"){pending=null;hints.clear();render();return true}const lower=key.toLowerCase();if(pending.type==="link"&&lower==="n"){const source=selectedId;pending=null;hints.clear();addNode({linkedTo:source});return true}if(!/^[a-z]$/.test(lower))return false;pending.buffer+=lower;const exact=hints.get(pending.buffer);const possible=[...hints.keys()].some(c=>c.startsWith(pending.buffer));if(exact){const type=pending.type;pending=null;hints.clear();if(type==="select"){selectedId=exact;render();saveDraftSoon();toast("SELECT")}else if(type==="link")linkNodes(selectedId,exact);return true}if(!possible){pending.buffer="";toast("?")}return true}
+function handleHintKey(key){if(!pending)return false;if(key==="Escape"){pending=null;hints.clear();refreshNodeChrome();return true}const lower=key.toLowerCase();if(pending.type==="link"&&lower==="n"){const source=selectedId;pending=null;hints.clear();addNode({linkedTo:source});return true}if(!/^[a-z]$/.test(lower))return false;pending.buffer+=lower;const exact=hints.get(pending.buffer);const possible=[...hints.keys()].some(c=>c.startsWith(pending.buffer));if(exact){const type=pending.type;pending=null;hints.clear();if(type==="select"){selectedId=exact;refreshNodeChrome();saveDraftSoon();toast("SELECT")}else if(type==="link")linkNodes(selectedId,exact);return true}if(!possible){pending.buffer="";toast("?")}return true}
 let zPrefix="",zTimer=null;
 function handleZoomKey(key){const k=key.toLowerCase();if(!zPrefix){if(k!=="z")return false;zPrefix="z";clearTimeout(zTimer);zTimer=setTimeout(()=>zPrefix="",900);toast("ZOOM");return true}
   clearTimeout(zTimer);zTimer=setTimeout(()=>zPrefix="",900);
@@ -196,7 +208,7 @@ function globalKey(e){
     if(e.key==="Escape"){e.preventDefault();setMode("graph");return}
     const k=e.key.toLowerCase(),step=e.shiftKey?80:34;if(k==="w"||k==="k"){e.preventDefault();pan(0,step)}else if(k==="s"||k==="j"){e.preventDefault();pan(0,-step)}else if(k==="a"||k==="h"){e.preventDefault();pan(step,0)}else if(k==="d"||k==="l"){e.preventDefault();pan(-step,0)}return
   }
-  if(e.key==="Escape"){e.preventDefault();selectedId=null;pending=null;hints.clear();render();return}
+  if(e.key==="Escape"){e.preventDefault();selectedId=null;pending=null;hints.clear();refreshNodeChrome();return}
   const k=e.key.toLowerCase();
   if(k==="s"){e.preventDefault();showHints("select");return}
   if(k==="l"){e.preventDefault();if(!selectedId){toast("SELECT FIRST");showHints("select")}else showHints("link");return}
@@ -218,7 +230,7 @@ function endPointer(e){
   if(!pointers.size){drag=null;canvas.classList.remove("dragging");saveDraftSoon()}
 }
 canvas.addEventListener("pointerup",endPointer);canvas.addEventListener("pointercancel",endPointer);
-canvas.addEventListener("click",e=>{if(e.target===canvas&&mode==="graph"){selectedId=null;render()}});
+canvas.addEventListener("click",e=>{if(e.target===canvas&&mode==="graph"){selectedId=null;pending=null;hints.clear();refreshNodeChrome();saveDraftSoon()}});
 
 function markdownNode(n){
   const lines=n.text.replace(/\r/g,"").split("\n").map(x=>x.trimEnd());
@@ -233,7 +245,12 @@ function markdown(){
   return `---\ntype: thought-graph\ncreated: ${createdAt}\n---\n\n# 連想\n\n${body}\n\n<!-- thought-edges\n${es}\n-->\n`
 }
 function saveDraftSoon(){clearTimeout(draftTimer);draftTimer=setTimeout(saveDraft,300)}
-function saveDraft(){try{localStorage.setItem(DRAFT_KEY,JSON.stringify({nodes,edges,selectedId,camera,sessionId,createdAt,updatedAt:new Date().toISOString()}))}catch(e){}}
+function saveDraft(){
+  try{
+    const editing=editorState?{...editorState,text:String(editorState.text??"")}:null;
+    localStorage.setItem(DRAFT_KEY,JSON.stringify({nodes,edges,selectedId,camera,sessionId,createdAt,editorState:editing,updatedAt:new Date().toISOString()}))
+  }catch(e){}
+}
 function loadDraft(){
   try{
     const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||"null");
@@ -242,6 +259,10 @@ function loadDraft(){
       camera=d.camera&&Number.isFinite(d.camera.x)&&Number.isFinite(d.camera.y)&&Number.isFinite(d.camera.scale)?d.camera:camera;
       sessionId=typeof d.sessionId==="string"&&d.sessionId?d.sessionId:null;
       createdAt=typeof d.createdAt==="string"&&d.createdAt?d.createdAt:null;
+      if(d.editorState&&typeof d.editorState.id==="string"&&nodes.some(n=>n.id===d.editorState.id)){
+        editorState={id:d.editorState.id,text:String(d.editorState.text??""),isNew:!!d.editorState.isNew,previous:String(d.editorState.previous??"")};
+        selectedId=d.editorState.id
+      }else editorState=null;
       ensureSessionMetadata();
       return true
     }
@@ -267,19 +288,75 @@ function b64(str){
   }
   return btoa(binary)
 }
-async function saveGitHub(){if(!nodes.some(n=>n.text.trim())){toast("EMPTY");return}if(!settings?.token){openSettings();toast("SETTINGS");return}ensureSessionMetadata();saveDraft();const path=`${settings.folder}/${sessionId}-thought-graph.md`,api=`https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${path}`;$("saveBtn").disabled=true;$("saveBtn").textContent="保存中";try{let sha=null;const get=await fetch(`${api}?ref=${encodeURIComponent(settings.branch||"main")}`,{headers:{Authorization:`Bearer ${settings.token}`,Accept:"application/vnd.github+json"}});if(get.ok){const data=await get.json();sha=data.sha}else if(get.status!==404)throw new Error(`GET ${get.status}`);const body={message:`Zen graph: ${nodes.find(n=>n.text.trim())?.text.slice(0,36)||sessionId}`,content:b64(markdown()),branch:settings.branch||"main"};if(sha)body.sha=sha;const res=await fetch(api,{method:"PUT",headers:{Authorization:`Bearer ${settings.token}`,Accept:"application/vnd.github+json","Content-Type":"application/json"},body:JSON.stringify(body)});if(!res.ok){const data=await res.json().catch(()=>({}));throw new Error(data.message||`PUT ${res.status}`)}toast("SAVED") }catch(e){toast("SAVE ERROR");console.error(e)}finally{$("saveBtn").disabled=false;$("saveBtn").textContent="投稿"}}
+function githubFailure(res,data,phase){
+  const message=data?.message||"";
+  const remaining=res.headers.get("x-ratelimit-remaining");
+  const reset=Number(res.headers.get("x-ratelimit-reset")||0);
+  if(res.status===401)return "GitHub認証エラー：Tokenを確認";
+  if(res.status===403&&remaining==="0"){
+    const at=reset?new Date(reset*1000).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"しばらく後";
+    return `GitHub API上限：${at}以降に再試行`
+  }
+  if(res.status===403)return "GitHub権限不足：Contentsの書き込み権限を確認";
+  if(res.status===404)return `${phase} 404：Repository / Branch / Token権限を確認`;
+  if(res.status===409)return "GitHub競合：最新版を読み直して再投稿";
+  if(res.status===422)return "GitHub設定エラー：保存先・Branch・内容を確認";
+  return `${phase} ${res.status}${message?`：${message}`:""}`
+}
+async function saveGitHub(){if(!nodes.some(n=>n.text.trim())&&!editorState?.text?.trim()){toast("EMPTY");return}if(!settings?.token){openSettings();toast("SETTINGS",2200);return}if(editorState){const n=nodeById(editorState.id);if(n)n.text=editorState.text}ensureSessionMetadata();saveDraft();const path=`${settings.folder}/${sessionId}-thought-graph.md`,api=`https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${path}`;$("saveBtn").disabled=true;$("saveBtn").textContent="保存中";try{let sha=null;const get=await fetch(`${api}?ref=${encodeURIComponent(settings.branch||"main")}`,{headers:{Authorization:`Bearer ${settings.token}`,Accept:"application/vnd.github+json"}});if(get.ok){const data=await get.json();sha=data.sha}else if(get.status!==404){const data=await get.json().catch(()=>({}));throw new Error(githubFailure(get,data,"GET"))};const body={message:`Zen graph: ${nodes.find(n=>n.text.trim())?.text.slice(0,36)||sessionId}`,content:b64(markdown()),branch:settings.branch||"main"};if(sha)body.sha=sha;const res=await fetch(api,{method:"PUT",headers:{Authorization:`Bearer ${settings.token}`,Accept:"application/vnd.github+json","Content-Type":"application/json"},body:JSON.stringify(body)});if(!res.ok){const data=await res.json().catch(()=>({}));throw new Error(githubFailure(res,data,"PUT"))}toast("SAVED") }catch(e){toast(e.message||"SAVE ERROR",4200);console.error(e)}finally{$("saveBtn").disabled=false;$("saveBtn").textContent="投稿"}}
 
 $("gearBtn").onclick=openSettings;$("saveSettings").onclick=saveSettings;$("clearSettings").onclick=()=>{localStorage.removeItem(SETTINGS_KEY);settings=null;$("settingsOverlay").classList.remove("open")};$("settingsOverlay").onclick=e=>{if(e.target===$("settingsOverlay"))$("settingsOverlay").classList.remove("open")};$("saveBtn").onclick=saveGitHub;$("allBtn").onclick=fitAll;$("plusBtn").onclick=()=>zoomBy(1.14);$("minusBtn").onclick=()=>zoomBy(1/1.14);
-function handleResize(){
-  const centerWorld={x:(viewport.w/2-camera.x)/camera.scale,y:(viewport.h/2-camera.y)/camera.scale};
-  viewport={w:innerWidth,h:innerHeight};
-  camera.x=viewport.w/2-centerWorld.x*camera.scale;
-  camera.y=viewport.h/2-centerWorld.y*camera.scale;
-  applyCamera();saveDraftSoon()
+function currentViewport(){
+  const vv=window.visualViewport;
+  return {w:vv?.width||innerWidth,h:vv?.height||innerHeight,offsetTop:vv?.offsetTop||0}
 }
-window.addEventListener("resize",handleResize);window.addEventListener("beforeunload",saveDraft);
+function keepEditorVisible(){
+  if(!editorState)return;
+  const n=nodeById(editorState.id);if(!n)return;
+  const v=currentViewport(),p=worldToScreen(n.x,n.y);
+  const top=84,bottom=Math.max(top+80,v.h-170);
+  let dy=0;
+  if(p.y<top)dy=top-p.y;
+  else if(p.y>bottom)dy=bottom-p.y;
+  if(dy){camera.y+=dy;applyCamera();saveDraftSoon()}
+}
+let viewportTimer=null;
+function handleResize(){
+  clearTimeout(viewportTimer);
+  viewportTimer=setTimeout(()=>{
+    const next=currentViewport();
+    const keyboardLikely=mode==="text"&&editorState&&next.h<innerHeight*.86;
+    if(keyboardLikely){
+      viewport=next;keepEditorVisible();return
+    }
+    const centerWorld={x:(viewport.w/2-camera.x)/camera.scale,y:(viewport.h/2-camera.y)/camera.scale};
+    viewport=next;
+    camera.x=viewport.w/2-centerWorld.x*camera.scale;
+    camera.y=viewport.h/2-centerWorld.y*camera.scale;
+    applyCamera();saveDraftSoon()
+  },60)
+}
+window.addEventListener("resize",handleResize);
+if(window.visualViewport){
+  visualViewport.addEventListener("resize",handleResize);
+  visualViewport.addEventListener("scroll",()=>{if(mode==="text")keepEditorVisible()})
+}
+window.addEventListener("beforeunload",saveDraft);
+window.addEventListener("pagehide",saveDraft);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")saveDraft()});
 
-(function init(){loadSettings();if(!loadDraft()){makeSession();nodes=[{id:uid(),text:"キーボードだけで操作する",x:0,y:0},{id:uid(),text:"入力デバイスに依存しない",x:340,y:-130},{id:uid(),text:"思考を止めない",x:340,y:70}];edges=[{a:nodes[0].id,b:nodes[1].id},{a:nodes[0].id,b:nodes[2].id}];selectedId=nodes[0].id;camera={x:innerWidth*.40,y:innerHeight*.48,scale:1};saveDraft()}setMode("graph");render()})();
+(function init(){
+  loadSettings();
+  viewport=currentViewport();
+  if(!loadDraft()){
+    makeSession();
+    nodes=[{id:uid(),text:"キーボードだけで操作する",x:0,y:0},{id:uid(),text:"入力デバイスに依存しない",x:340,y:-130},{id:uid(),text:"思考を止めない",x:340,y:70}];
+    edges=[{a:nodes[0].id,b:nodes[1].id},{a:nodes[0].id,b:nodes[2].id}];
+    selectedId=nodes[0].id;camera={x:innerWidth*.40,y:innerHeight*.48,scale:1};saveDraft()
+  }
+  setMode(editorState?"text":"graph");render();
+  if(editorState)requestAnimationFrame(keepEditorVisible)
+})();
 </script>
 </body>
 </html>
