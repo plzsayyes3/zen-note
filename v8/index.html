@@ -40,7 +40,7 @@ button{touch-action:manipulation}
 .zoomBadge{position:absolute;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:20;display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--hair);background:rgba(255,255,255,.88);border-radius:12px;color:#777c85;font:10px/1 ui-monospace,SFMono-Regular,Menlo,monospace}.zoomBadge button{border:0;background:none;color:#60656e;padding:0 3px;cursor:pointer}
 .overlay{position:fixed;inset:0;background:rgba(30,32,36,.30);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:18px;z-index:60}.overlay.open{display:flex}
 .modal{width:min(430px,100%);max-height:88dvh;overflow:auto;background:#fff;border:1px solid var(--hair);border-radius:18px;padding:22px;box-shadow:0 24px 80px rgba(20,25,35,.18)}.modal h2{font-size:17px;margin:0 0 5px}.modal .sub{font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:18px}.field{margin:12px 0}.field label{display:block;font:9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:#8f949d;letter-spacing:.08em;margin-bottom:6px}.field input{width:100%;border:1px solid var(--hair);border-radius:10px;padding:10px 11px;outline:none;background:#fafafa;color:var(--ink);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.row{display:flex;justify-content:space-between;gap:8px;margin-top:18px}.btn{border:1px solid var(--hair);background:#fff;color:#444951;border-radius:10px;padding:9px 12px;cursor:pointer}.btn.primary{background:#2468e8;color:#fff;border-color:#2468e8}
-@media(max-width:700px){.topbar{height:58px;padding-left:12px;padding-right:12px}.brandSub{display:none}.brandTitle{font-size:13px}.mode{padding:7px 8px;font-size:9px}.actions .iconBtn:not(.primary){display:none}.node{width:210px;padding:14px 15px;border-radius:16px}.nodeText,.editor{font-size:15px}.help{display:none}.zoomBadge{right:10px;bottom:calc(10px + env(safe-area-inset-bottom))}}
+@media(max-width:700px){.topbar{height:58px;padding-left:12px;padding-right:12px}.brandSub{display:none}.brandTitle{font-size:13px}.mode{padding:7px 8px;font-size:9px}.actions .iconBtn:not(.primary){display:none}.node{width:210px;padding:14px 15px;border-radius:16px}.nodeText{font-size:15px}.editor{font-size:16px}.help{display:none}.zoomBadge{right:10px;bottom:calc(10px + env(safe-area-inset-bottom))}}
 </style>
 </head>
 <body>
@@ -119,12 +119,35 @@ function render(){
     const hint=document.createElement("span");hint.className="hint";hint.textContent=hintForNode(n.id).toUpperCase();el.appendChild(hint);
     if(editorState?.id===n.id){const ta=document.createElement("textarea");ta.className="editor";ta.value=editorState.text;ta.rows=2;ta.addEventListener("compositionstart",()=>isComposing=true);ta.addEventListener("compositionend",()=>{isComposing=false;editorState.text=ta.value;saveDraftSoon()});ta.addEventListener("input",()=>{editorState.text=ta.value;autoSize(ta);saveDraftSoon()});ta.addEventListener("keydown",e=>handleEditorKey(e,ta));el.appendChild(ta);requestAnimationFrame(()=>{ta.focus();autoSize(ta);ta.setSelectionRange(ta.value.length,ta.value.length)})}
     else{const text=document.createElement("div");text.className="nodeText";text.textContent=n.text;const meta=document.createElement("div");meta.className="nodeMeta";meta.textContent="^"+n.id;el.append(text,meta)}
-    el.addEventListener("click",ev=>{if(mode==="text")return;ev.stopPropagation();selectedId=n.id;pending=null;hints.clear();setMode("graph");refreshNodeChrome();saveDraftSoon()});nodesEl.appendChild(el)
+    el.addEventListener("click",ev=>{
+      if(mode==="text")return;
+      ev.stopPropagation();
+      if(selectedId===n.id){
+        startText(n.id,{isNew:false,previous:n.text,focusNow:true});
+        return
+      }
+      selectedId=n.id;pending=null;hints.clear();setMode("graph");refreshNodeChrome();saveDraftSoon()
+    });nodesEl.appendChild(el)
   });
   applyCamera();
 }
 function autoSize(ta){ta.style.height="0px";ta.style.height=Math.min(210,Math.max(54,ta.scrollHeight))+"px"}
-function startText(id,{isNew=false,previous=""}={}){const n=nodeById(id);if(!n)return;pending=null;hints.clear();selectedId=id;editorState={id,text:n.text,isNew,previous};setMode("text");render();saveDraftSoon();requestAnimationFrame(keepEditorVisible)}
+function focusEditorNow(){
+  const ta=nodesEl.querySelector(`.node[data-id="${CSS.escape(editorState?.id||"")}"] .editor`);
+  if(!ta)return false;
+  try{
+    ta.focus({preventScroll:true});
+    ta.setSelectionRange(ta.value.length,ta.value.length);
+    return document.activeElement===ta
+  }catch(_){return false}
+}
+function startText(id,{isNew=false,previous="",focusNow=false}={}){
+  const n=nodeById(id);if(!n)return;
+  pending=null;hints.clear();selectedId=id;editorState={id,text:n.text,isNew,previous};
+  setMode("text");render();saveDraftSoon();
+  if(focusNow)focusEditorNow();
+  requestAnimationFrame(keepEditorVisible)
+}
 function finishText(commit){
   if(!editorState)return;
   const st=editorState,n=nodeById(st.id);
@@ -183,7 +206,7 @@ function addNode({linkedTo=null}={}){pushHistory();const p=linkedTo?childPositio
 function revealNewNode(parentId,newId){const p=nodeById(parentId),n=nodeById(newId);if(!p||!n)return;const from={...camera};const targetX=innerWidth*.68-n.x*camera.scale;const targetY=innerHeight*.52-n.y*camera.scale;camera.x+=(targetX-camera.x)*.7;camera.y+=(targetY-camera.y)*.7;animateCamera(from)}
 function linkNodes(a,b){if(!a||!b||a===b)return;const k=edgeKey(a,b);if(edges.some(e=>edgeKey(e.a,e.b)===k)){toast("ALREADY LINKED");return}pushHistory();edges.push({a,b});selectedId=a;pending=null;hints.clear();render();saveDraftSoon();toast("LINKED")}
 function removeNode(id,track=true){if(track)pushHistory();nodes=nodes.filter(n=>n.id!==id);edges=edges.filter(e=>e.a!==id&&e.b!==id);if(selectedId===id)selectedId=null;if(editorState?.id===id)editorState=null;render();saveDraftSoon()}
-function editSelected(){if(!selectedId)return;const n=nodeById(selectedId);startText(selectedId,{isNew:false,previous:n.text})}
+function editSelected({focusNow=false}={}){if(!selectedId)return;const n=nodeById(selectedId);startText(selectedId,{isNew:false,previous:n.text,focusNow})}
 function fitAll(){if(!nodes.length)return;const from={...camera};const minX=Math.min(...nodes.map(n=>n.x-NODE_W/2)),maxX=Math.max(...nodes.map(n=>n.x+NODE_W/2)),minY=Math.min(...nodes.map(n=>n.y-NODE_H/2)),maxY=Math.max(...nodes.map(n=>n.y+NODE_H/2));const pad=90,w=maxX-minX,h=maxY-minY;const scale=Math.max(.18,Math.min(2.4,Math.min((innerWidth-pad*2)/w,(innerHeight-pad*2)/h)));camera.scale=scale;camera.x=innerWidth/2-((minX+maxX)/2)*scale;camera.y=innerHeight/2-((minY+maxY)/2)*scale;animateCamera(from)}
 function zoomBy(factor,focusId=null){const from={...camera};const old=camera.scale,next=Math.max(.18,Math.min(3.2,old*factor));let sx=innerWidth/2,sy=innerHeight/2;if(focusId){const n=nodeById(focusId);if(n){sx=innerWidth/2;sy=innerHeight/2;camera.x=sx-n.x*old;camera.y=sy-n.y*old}}
   const worldPt=screenToWorld(sx,sy);camera.scale=next;camera.x=sx-worldPt.x*next;camera.y=sy-worldPt.y*next;if(focusId){const n=nodeById(focusId);if(n){camera.x=innerWidth/2-n.x*next;camera.y=innerHeight/2-n.y*next}}animateCamera(from)}
@@ -219,7 +242,7 @@ function globalKey(e){
 }
 
 document.addEventListener("keydown",globalKey);
-canvas.addEventListener("dblclick",e=>{if(mode!=="graph"||e.target.closest(".node"))return;pushHistory();const p=screenToWorld(e.clientX,e.clientY),n={id:uid(),text:"",x:p.x,y:p.y};nodes.push(n);selectedId=n.id;startText(n.id,{isNew:true,previous:""})});
+canvas.addEventListener("dblclick",e=>{if(mode!=="graph"||e.target.closest(".node"))return;pushHistory();const p=screenToWorld(e.clientX,e.clientY),n={id:uid(),text:"",x:p.x,y:p.y};nodes.push(n);selectedId=n.id;startText(n.id,{isNew:true,previous:"",focusNow:true})});
 canvas.addEventListener("wheel",e=>{e.preventDefault();const factor=e.deltaY<0?1.09:1/1.09;zoomAroundScreen(factor,e.clientX,e.clientY)},{passive:false});
 canvas.addEventListener("pointerdown",e=>{if(e.target.closest(".node"))return;canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1){drag={x:e.clientX,y:e.clientY,cx:camera.x,cy:camera.y};canvas.classList.add("dragging")}else if(pointers.size===2){const p=[...pointers.values()];pinchStart={dist:Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y),scale:camera.scale,mid:{x:(p[0].x+p[1].x)/2,y:(p[0].y+p[1].y)/2},world:screenToWorld((p[0].x+p[1].x)/2,(p[0].y+p[1].y)/2)}}});
 canvas.addEventListener("pointermove",e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2&&pinchStart){const p=[...pointers.values()],dist=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y),mid={x:(p[0].x+p[1].x)/2,y:(p[0].y+p[1].y)/2};camera.scale=Math.max(.18,Math.min(3.2,pinchStart.scale*(dist/pinchStart.dist)));camera.x=mid.x-pinchStart.world.x*camera.scale;camera.y=mid.y-pinchStart.world.y*camera.scale;applyCamera()}else if(pointers.size===1&&drag&&(mode==="camera"||e.pointerType!=="mouse")){camera.x=drag.cx+(e.clientX-drag.x);camera.y=drag.cy+(e.clientY-drag.y);applyCamera()}});
@@ -305,6 +328,23 @@ function githubFailure(res,data,phase){
 }
 async function saveGitHub(){if(!nodes.some(n=>n.text.trim())&&!editorState?.text?.trim()){toast("EMPTY");return}if(!settings?.token){openSettings();toast("SETTINGS",2200);return}if(editorState){const n=nodeById(editorState.id);if(n)n.text=editorState.text}ensureSessionMetadata();saveDraft();const path=`${settings.folder}/${sessionId}-thought-graph.md`,api=`https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${path}`;$("saveBtn").disabled=true;$("saveBtn").textContent="保存中";try{let sha=null;const get=await fetch(`${api}?ref=${encodeURIComponent(settings.branch||"main")}`,{headers:{Authorization:`Bearer ${settings.token}`,Accept:"application/vnd.github+json"}});if(get.ok){const data=await get.json();sha=data.sha}else if(get.status!==404){const data=await get.json().catch(()=>({}));throw new Error(githubFailure(get,data,"GET"))};const body={message:`Zen graph: ${nodes.find(n=>n.text.trim())?.text.slice(0,36)||sessionId}`,content:b64(markdown()),branch:settings.branch||"main"};if(sha)body.sha=sha;const res=await fetch(api,{method:"PUT",headers:{Authorization:`Bearer ${settings.token}`,Accept:"application/vnd.github+json","Content-Type":"application/json"},body:JSON.stringify(body)});if(!res.ok){const data=await res.json().catch(()=>({}));throw new Error(githubFailure(res,data,"PUT"))}toast("SAVED") }catch(e){toast(e.message||"SAVE ERROR",4200);console.error(e)}finally{$("saveBtn").disabled=false;$("saveBtn").textContent="投稿"}}
 
+document.querySelectorAll(".mode").forEach(el=>el.addEventListener("click",()=>{
+  const target=el.dataset.mode;
+  if(target==="graph"){
+    if(editorState)finishText(true);else setMode("graph");
+    return
+  }
+  if(target==="text"){
+    if(editorState){focusEditorNow();return}
+    if(selectedId)editSelected({focusNow:true});
+    else toast("ノードを選択してください",1800);
+    return
+  }
+  if(target==="camera"){
+    if(editorState)finishText(true);
+    setMode("camera");toast("CAMERA")
+  }
+}));
 $("gearBtn").onclick=openSettings;$("saveSettings").onclick=saveSettings;$("clearSettings").onclick=()=>{localStorage.removeItem(SETTINGS_KEY);settings=null;$("settingsOverlay").classList.remove("open")};$("settingsOverlay").onclick=e=>{if(e.target===$("settingsOverlay"))$("settingsOverlay").classList.remove("open")};$("saveBtn").onclick=saveGitHub;$("allBtn").onclick=fitAll;$("plusBtn").onclick=()=>zoomBy(1.14);$("minusBtn").onclick=()=>zoomBy(1/1.14);
 function currentViewport(){
   const vv=window.visualViewport;
