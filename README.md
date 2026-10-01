@@ -17,7 +17,7 @@
 | v6 | [/v6/](https://plzsayyes3.github.io/zen-note/v6/) | 「コンバットノート」。Geminiが短い反応と問いを1つだけ返す対話型ノート。対話終了後にMarkdownとしてGitHubへ保存する。 |
 | v7 | [/v7/](https://plzsayyes3.github.io/zen-note/v7/) | 「箇条書きモード」。1項目ずつ入力し、Enterで次項目、Tab / Shift+Tabまたは画面ボタンで階層化。保存時はMarkdownの箇条書きとしてInboxへ投稿する。 |
 | v8 | [/v8/](https://plzsayyes3.github.io/zen-note/v8/) | 「思考グラフ」。Graph / Text / Cameraを分離し、キーボード中心でノード作成・選択・接続・Zoom / Panを行う。Markdown + UID + hidden edgesとしてInboxへ保存する。 |
-
+| v9 | [/v9/](https://plzsayyes3.github.io/zen-note/v9/) | 「大文字ジャーナル」。スマホ横画面を主対象に35px前後の大きなHina Mincho系本文、Safe Area + 追加余白、時刻表示、20秒無入力でのlocalStorage自動保存を備える。現段階ではGitHub投稿は未接続。 |\n
 いずれも対象は `plzsayyes3/mynotebook` を既定値とし、GitHub Token・保存先は各モードの設定画面から変更可能。
 
 ## 仕組み
