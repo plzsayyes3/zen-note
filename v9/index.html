@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#f1f0eb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>禅ノート v9 — 大文字ジャーナル</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hina+Mincho&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f1f0eb;
+  --ink:#292924;
+  --muted:#8b8880;
+  --accent:#b8665d;
+  --pad-top:max(18px,calc(env(safe-area-inset-top) + 12px));
+  --pad-bottom:max(20px,calc(env(safe-area-inset-bottom) + 14px));
+  --pad-left:max(28px,calc(env(safe-area-inset-left) + 18px));
+  --pad-right:max(28px,calc(env(safe-area-inset-right) + 18px));
+  --editor-size:clamp(32px,3.8vw,38px);
+}
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--ink)}
+body{
+  font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background-image:radial-gradient(circle at 1px 1px,rgba(30,30,26,.025) 1px,transparent 0);
+  background-size:24px 24px;
+}
+.zen{
+  width:100%;height:100dvh;min-height:100vh;
+  display:grid;grid-template-rows:auto minmax(0,1fr) auto;
+  padding:var(--pad-top) var(--pad-right) var(--pad-bottom) var(--pad-left);
+}
+.top{
+  min-height:28px;display:flex;align-items:flex-start;justify-content:space-between;
+  gap:16px;pointer-events:none;user-select:none;
+}
+.mode{
+  color:var(--muted);
+  font:700 9px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.15em;opacity:.68;
+}
+.clock{
+  color:var(--muted);
+  font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.04em;opacity:.72;
+}
+.editor-wrap{min-height:0;display:flex;justify-content:center;padding:18px 0 10px}
+textarea{
+  width:min(100%,48em);height:100%;min-height:0;margin:0;padding:0;border:0;outline:0;
+  resize:none;background:transparent;color:var(--ink);
+  font-family:"Hina Mincho","Yu Mincho","YuMincho",serif;
+  font-size:var(--editor-size);font-weight:400;line-height:1.85;letter-spacing:.015em;
+  caret-color:var(--accent);
+  -webkit-text-size-adjust:100%;text-size-adjust:100%;
+  overscroll-behavior:contain;scrollbar-width:none;
+}
+textarea::-webkit-scrollbar{display:none}
+textarea::placeholder{color:#aaa79f;opacity:.62}
+.bottom{
+  min-height:24px;display:flex;align-items:flex-end;justify-content:space-between;
+  gap:18px;color:var(--muted);user-select:none;
+}
+.save-state,.count{
+  font:600 9px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.08em;opacity:.60;
+}
+.save-state{display:flex;align-items:center;gap:7px}
+.dot{
+  width:6px;height:6px;border-radius:50%;background:#b3b0aa;
+  transition:background .2s,opacity .2s;
+}
+.save-state.saving .dot{background:var(--accent)}
+.save-state.saved .dot{background:#6d786e}
+@media (orientation:portrait){
+  :root{
+    --editor-size:clamp(30px,7vw,36px);
+    --pad-left:max(24px,calc(env(safe-area-inset-left) + 16px));
+    --pad-right:max(24px,calc(env(safe-area-inset-right) + 16px));
+  }
+  .editor-wrap{padding-top:24px}
+  textarea{line-height:1.9}
+}
+@media (orientation:landscape) and (max-height:520px){
+  :root{
+    --editor-size:clamp(34px,4vw,38px);
+    --pad-top:max(14px,calc(env(safe-area-inset-top) + 10px));
+    --pad-bottom:max(14px,calc(env(safe-area-inset-bottom) + 10px));
+    --pad-left:max(34px,calc(env(safe-area-inset-left) + 20px));
+    --pad-right:max(34px,calc(env(safe-area-inset-right) + 20px));
+  }
+  .top{min-height:20px}
+  .editor-wrap{padding:10px 0 6px}
+  .bottom{min-height:18px}
+}
+@media (orientation:landscape) and (max-height:400px){
+  :root{--editor-size:34px}
+  .mode{opacity:.42}
+  .bottom{opacity:.72}
+}
+@media (prefers-color-scheme:dark){
+  body.auto-dark{
+    --bg:#111310;--ink:#ecebe5;--muted:#777b74;--accent:#d9897f;
+    background-image:radial-gradient(circle at 1px 1px,rgba(255,255,255,.022) 1px,transparent 0);
+  }
+  body.auto-dark textarea::placeholder{color:#777b74}
+}
+</style>
+</head>
+<body class="auto-dark">
+<main class="zen">
+  <header class="top">
+    <div class="mode">ZEN / LARGE WRITE</div>
+    <time class="clock" id="clock">--:--</time>
+  </header>
+  <section class="editor-wrap">
+    <textarea id="editor" autofocus spellcheck="true" autocapitalize="sentences" autocomplete="off"
+      placeholder="思いついたまま、ここに置く……" aria-label="ZEN入力欄"></textarea>
+  </section>
+  <footer class="bottom">
+    <div class="save-state saved" id="saveState"><span class="dot"></span><span id="saveLabel">LOCAL READY</span></div>
+    <div class="count"><span id="charCount">0</span> chars</div>
+  </footer>
+</main>
+<script>
+(() => {
+  const editor = document.getElementById('editor');
+  const clock = document.getElementById('clock');
+  const charCount = document.getElementById('charCount');
+  const saveState = document.getElementById('saveState');
+  const saveLabel = document.getElementById('saveLabel');
+  const STORAGE_KEY = 'zen-note-v9-draft';
+  const SAVE_DELAY = 20000;
+  let saveTimer = null;
+
+  const updateClock = () => {
+    const now = new Date();
+    clock.textContent = now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+  };
+  const setState = (state,label) => {
+    saveState.classList.remove('saving','saved');
+    saveState.classList.add(state);
+    saveLabel.textContent = label;
+  };
+  const save = () => {
+    localStorage.setItem(STORAGE_KEY,editor.value);
+    setState('saved','SAVED');
+  };
+  const scheduleSave = () => {
+    clearTimeout(saveTimer);
+    setState('saving','WRITING');
+    saveTimer = setTimeout(save,SAVE_DELAY);
+  };
+  const updateCount = () => {
+    charCount.textContent = editor.value.length.toLocaleString('ja-JP');
+  };
+
+  const restored = localStorage.getItem(STORAGE_KEY);
+  if(restored){
+    editor.value = restored;
+    setState('saved','RESTORED');
+  }
+
+  editor.addEventListener('input',() => {
+    updateCount();
+    scheduleSave();
+  });
+  document.addEventListener('visibilitychange',() => {
+    if(document.hidden && editor.value) save();
+  });
+  window.addEventListener('pagehide',() => {
+    if(editor.value) save();
+  });
+
+  updateClock();
+  updateCount();
+  setInterval(updateClock,1000);
+  requestAnimationFrame(() => editor.focus());
+})();
+</script>
+</body>
+</html>
