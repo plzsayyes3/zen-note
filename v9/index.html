@@ -234,7 +234,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
       owner:document.getElementById('f-owner').value.trim()||DEFAULTS.owner,
       repo:document.getElementById('f-repo').value.trim()||DEFAULTS.repo,
       branch:document.getElementById('f-branch').value.trim()||DEFAULTS.branch,
-      folder:(document.getElementById('f-folder').value.trim()||DEFAULTS.folder).replace(/^\\+|\\+$/g,'')
+      folder:(document.getElementById('f-folder').value.trim()||DEFAULTS.folder).replace(/^\/+|\/+$/g,'')
     };
     try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings))}catch(e){}
     closeSettings();
@@ -256,7 +256,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     save();
     setState('saving','SENDING…');
     const name=timestampName();
-    const folder=(settings.folder||DEFAULTS.folder).replace(/^\\+|\\+$/g,'');
+    const folder=(settings.folder||DEFAULTS.folder).replace(/^\/+|\/+$/g,'');
     const path=`${folder}/${name}.md`;
     const api=`https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${path}`;
     const options={
@@ -267,8 +267,8 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
         'Content-Type':'application/json'
       },
       body:JSON.stringify({
-        message:`Zen v9: ${body.replace(/\\s+/g,' ').slice(0,40)}`,
-        content:b64EncodeUnicode(body+'\\n'),
+        message:`Zen v9: ${body.replace(/\s+/g,' ').slice(0,40)}`,
+        content:b64EncodeUnicode(body+'\n'),
         branch:settings.branch||DEFAULTS.branch
       })
     };
