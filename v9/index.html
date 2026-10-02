@@ -114,6 +114,16 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
 .break-copy span{display:block}
 .break-skip{margin-top:8px;border:0;background:transparent;color:var(--muted);font:700 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;cursor:pointer;opacity:.65}
 .break-skip:hover,.break-skip:focus-visible{opacity:1;outline:none}
+body.rest-theme-light{
+  --bg:#f1f0eb;--ink:#292924;--muted:#8b8880;--accent:#b8665d;
+  background-image:radial-gradient(circle at 1px 1px,rgba(30,30,26,.025) 1px,transparent 0);
+}
+body.rest-theme-dark{
+  --bg:#111310;--ink:#ecebe5;--muted:#777b74;--accent:#d9897f;
+  background-image:radial-gradient(circle at 1px 1px,rgba(255,255,255,.022) 1px,transparent 0);
+}
+body.rest-theme-light .break-screen{background:rgba(241,240,235,.96)}
+body.rest-theme-dark .break-screen{background:rgba(17,19,16,.96)}
 @media (prefers-color-scheme:dark){
   body.auto-dark .break-screen{background:rgba(17,19,16,.96)}
 }
@@ -156,7 +166,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
 <main class="zen">
   <header class="top">
     <div class="mode-row"><div class="mode">ZEN / LARGE WRITE</div><button class="gear" id="gear" type="button" aria-label="GitHub接続設定">⚙</button></div>
-    <div class="top-right"><button class="pomo" id="pomoButton" type="button" aria-label="ポモドーロタイマー">FOCUS 25:00</button><time class="clock" id="clock">--:--</time></div>
+    <div class="top-right"><button class="pomo" id="pomoButton" type="button" aria-label="ポモドーロタイマー">FOCUS 05:00</button><time class="clock" id="clock">--:--</time></div>
   </header>
   <section class="editor-wrap">
     <textarea id="editor" autofocus spellcheck="true" autocapitalize="sentences" autocomplete="off"
@@ -182,7 +192,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
 <div class="break-screen" id="breakScreen" aria-hidden="true">
   <div class="break-inner">
     <div class="break-kicker">REST</div>
-    <div class="break-time" id="breakTime">05:00</div>
+    <div class="break-time" id="breakTime">01:00</div>
     <div class="break-copy"><span>入力を止める。</span><span>目を上げる。</span><span>深呼吸する。</span></div>
     <button class="break-skip" id="breakSkip" type="button">SKIP REST</button>
   </div>
@@ -202,6 +212,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
   const POMO_KEY = 'zen-note-v9-pomodoro';
   const FOCUS_MS = 5 * 60 * 1000;
   const BREAK_MS = 1 * 60 * 1000;
+  const STOP_DELAY_MS = 1500;
   const gear = document.getElementById('gear');
   const settingsOverlay = document.getElementById('settingsOverlay');
   const settingsClose = document.getElementById('settingsClose');
@@ -212,9 +223,11 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
   const breakTime = document.getElementById('breakTime');
   const breakSkip = document.getElementById('breakSkip');
   let saveTimer = null;
+  let stopTimer = null;
+  let lastInputAt = 0;
   let sending = false;
   let settings = null;
-  let pomo = {phase:'focus',running:false,endAt:null,remainingMs:FOCUS_MS};
+  let pomo = {phase:'focus',running:false,endAt:null,remainingMs:FOCUS_MS,focusTheme:null};
 
   const updateClock = () => {
     const now = new Date();
@@ -244,8 +257,17 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     const sec = total%60;
     return `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
   };
+  const systemTheme = () => window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   const savePomo = () => {
     try{localStorage.setItem(POMO_KEY,JSON.stringify(pomo))}catch(e){}
+  };
+  const applyRestTheme = () => {
+    const focusTheme = pomo.focusTheme || systemTheme();
+    document.body.classList.remove('rest-theme-light','rest-theme-dark');
+    document.body.classList.add(focusTheme==='dark'?'rest-theme-light':'rest-theme-dark');
+  };
+  const clearRestTheme = () => {
+    document.body.classList.remove('rest-theme-light','rest-theme-dark');
   };
   const showBreak = () => {
     breakScreen.classList.add('open');
@@ -256,33 +278,76 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     breakScreen.classList.remove('open');
     breakScreen.setAttribute('aria-hidden','true');
   };
-  const setPomoPhase = (phase,autoStart=true) => {
-    pomo.phase=phase;
-    pomo.remainingMs=phase==='focus'?FOCUS_MS:BREAK_MS;
-    pomo.running=autoStart;
-    pomo.endAt=autoStart?Date.now()+pomo.remainingMs:null;
-    if(phase==='break'){
-      if(editor.value) save();
-      showBreak();
-    }else{
-      hideBreak();
-      requestAnimationFrame(()=>editor.focus());
-    }
+  const startFocus = (autoStart=true) => {
+    clearTimeout(stopTimer);
+    clearRestTheme();
+    hideBreak();
+    pomo={
+      phase:'focus',
+      running:autoStart,
+      endAt:autoStart?Date.now()+FOCUS_MS:null,
+      remainingMs:FOCUS_MS,
+      focusTheme:systemTheme()
+    };
+    savePomo();
+    renderPomo();
+    if(autoStart)requestAnimationFrame(()=>editor.focus());
+  };
+  const beginBreak = () => {
+    clearTimeout(stopTimer);
+    if(pomo.phase!=='rest-pending')return;
+    if(editor.value) save();
+    pomo.phase='break';
+    pomo.running=true;
+    pomo.remainingMs=BREAK_MS;
+    pomo.endAt=Date.now()+BREAK_MS;
+    applyRestTheme();
+    showBreak();
     savePomo();
     renderPomo();
   };
+  const scheduleBreakAfterStop = () => {
+    if(pomo.phase!=='rest-pending')return;
+    clearTimeout(stopTimer);
+    const elapsed=Date.now()-lastInputAt;
+    const wait=Math.max(0,STOP_DELAY_MS-elapsed);
+    stopTimer=setTimeout(beginBreak,wait);
+  };
+  const enterRestPending = () => {
+    clearTimeout(stopTimer);
+    pomo.phase='rest-pending';
+    pomo.running=false;
+    pomo.endAt=null;
+    pomo.remainingMs=BREAK_MS;
+    pomo.focusTheme=pomo.focusTheme||systemTheme();
+    applyRestTheme();
+    hideBreak();
+    savePomo();
+    renderPomo();
+    scheduleBreakAfterStop();
+  };
   const startPomoIfIdle = () => {
-    if(pomo.running)return;
-    if(pomo.phase!=='focus' || pomo.remainingMs<=0 || pomo.remainingMs>FOCUS_MS){
-      pomo.phase='focus';
-      pomo.remainingMs=FOCUS_MS;
+    if(pomo.phase==='rest-pending'){
+      scheduleBreakAfterStop();
+      return;
     }
+    if(pomo.running)return;
+    if(pomo.phase!=='focus'){
+      startFocus(true);
+      return;
+    }
+    if(pomo.remainingMs<=0 || pomo.remainingMs>FOCUS_MS)pomo.remainingMs=FOCUS_MS;
+    pomo.focusTheme=pomo.focusTheme||systemTheme();
     pomo.running=true;
     pomo.endAt=Date.now()+pomo.remainingMs;
     savePomo();
     renderPomo();
   };
   const togglePomo = () => {
+    if(pomo.phase==='rest-pending'){
+      beginBreak();
+      return;
+    }
     if(pomo.running){
       pomo.remainingMs=Math.max(0,pomo.endAt-Date.now());
       pomo.running=false;
@@ -295,11 +360,18 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     savePomo();
     renderPomo();
   };
-  const advancePomo = () => {
-    if(pomo.phase==='focus')setPomoPhase('break',true);
-    else setPomoPhase('focus',true);
-  };
   const renderPomo = () => {
+    if(pomo.phase==='rest-pending'){
+      pomoButton.textContent='REST READY';
+      pomoButton.classList.remove('running');
+      pomoButton.classList.add('breaking');
+      pomoButton.setAttribute('aria-label','入力を止めると1分休憩を開始');
+      breakTime.textContent='01:00';
+      applyRestTheme();
+      hideBreak();
+      return;
+    }
+
     let remaining=pomo.remainingMs;
     if(pomo.running && pomo.endAt)remaining=Math.max(0,pomo.endAt-Date.now());
     pomo.remainingMs=remaining;
@@ -309,42 +381,50 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     pomoButton.classList.toggle('breaking',pomo.phase==='break');
     pomoButton.setAttribute('aria-label',`${pomo.phase==='focus'?'集中':'休憩'}タイマー ${formatTimer(remaining)} ${pomo.running?'実行中':'一時停止'}`);
     breakTime.textContent=formatTimer(remaining);
-    if(pomo.phase==='break')showBreak();
-    else hideBreak();
-    if(pomo.running && remaining<=0)advancePomo();
+
+    if(pomo.phase==='break'){
+      applyRestTheme();
+      showBreak();
+    }else{
+      clearRestTheme();
+      hideBreak();
+    }
+
+    if(pomo.running && remaining<=0){
+      if(pomo.phase==='focus')enterRestPending();
+      else startFocus(true);
+    }
   };
   const loadPomo = () => {
     try{
       const raw=JSON.parse(localStorage.getItem(POMO_KEY)||'null');
-      if(raw && (raw.phase==='focus'||raw.phase==='break')){
+      if(raw && ['focus','rest-pending','break'].includes(raw.phase)){
         const maxMs=raw.phase==='focus'?FOCUS_MS:BREAK_MS;
         const rawRemaining=Number.isFinite(raw.remainingMs)?raw.remainingMs:maxMs;
         const rawEndAt=Number.isFinite(raw.endAt)?raw.endAt:null;
         const endRemaining=rawEndAt?rawEndAt-Date.now():rawRemaining;
-        const migrated=endRemaining>maxMs+5000 || rawRemaining>maxMs+5000;
+        const migrated=rawRemaining>maxMs+5000 || (raw.phase!=='rest-pending' && endRemaining>maxMs+5000);
         pomo={
           phase:migrated?'focus':raw.phase,
           running:migrated?false:Boolean(raw.running),
           endAt:migrated?null:rawEndAt,
-          remainingMs:migrated?FOCUS_MS:Math.min(maxMs,Math.max(0,rawRemaining))
+          remainingMs:migrated?FOCUS_MS:Math.min(maxMs,Math.max(0,rawRemaining)),
+          focusTheme:raw.focusTheme==='dark'||raw.focusTheme==='light'?raw.focusTheme:systemTheme()
         };
       }
     }catch(e){}
-    if(pomo.running && pomo.endAt){
-      while(Date.now()>=pomo.endAt){
-        const over=Date.now()-pomo.endAt;
-        if(pomo.phase==='focus'){
-          pomo.phase='break';
-          pomo.endAt=Date.now()+(BREAK_MS-(over%BREAK_MS));
-          pomo.remainingMs=Math.max(0,pomo.endAt-Date.now());
-          break;
-        }else{
-          pomo.phase='focus';
-          pomo.endAt=Date.now()+(FOCUS_MS-(over%FOCUS_MS));
-          pomo.remainingMs=Math.max(0,pomo.endAt-Date.now());
-          break;
-        }
-      }
+
+    if(pomo.phase==='focus' && pomo.running && pomo.endAt && Date.now()>=pomo.endAt){
+      enterRestPending();
+      return;
+    }
+    if(pomo.phase==='break' && pomo.running && pomo.endAt && Date.now()>=pomo.endAt){
+      startFocus(true);
+      return;
+    }
+    if(pomo.phase==='rest-pending'){
+      applyRestTheme();
+      scheduleBreakAfterStop();
     }
     renderPomo();
   };
@@ -459,9 +539,11 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
   }
 
   editor.addEventListener('input',() => {
+    lastInputAt=Date.now();
     updateCount();
     scheduleSave();
-    startPomoIfIdle();
+    if(pomo.phase==='rest-pending')scheduleBreakAfterStop();
+    else startPomoIfIdle();
   });
   editor.addEventListener('keydown',event => {
     if(event.isComposing)return;
@@ -471,7 +553,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     }
   });
   pomoButton.addEventListener('click',togglePomo);
-  breakSkip.addEventListener('click',()=>setPomoPhase('focus',true));
+  breakSkip.addEventListener('click',()=>startFocus(true));
   gear.addEventListener('click',openSettings);
   settingsClose.addEventListener('click',closeSettings);
   settingsSave.addEventListener('click',saveSettingsNow);
