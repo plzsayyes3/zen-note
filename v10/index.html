@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#f1f0eb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>禅ノート v10 — Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hina+Mincho&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f1f0eb;
+  --ink:#292924;
+  --muted:#8b8880;
+  --accent:#b8665d;
+  --pad-top:max(18px,calc(env(safe-area-inset-top) + 12px));
+  --pad-bottom:max(20px,calc(env(safe-area-inset-bottom) + 14px));
+  --pad-left:max(28px,calc(env(safe-area-inset-left) + 18px));
+  --pad-right:max(28px,calc(env(safe-area-inset-right) + 18px));
+  --editor-size:clamp(32px,3.8vw,38px);
+}
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--ink)}
+body{
+  font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background-image:radial-gradient(circle at 1px 1px,rgba(30,30,26,.025) 1px,transparent 0);
+  background-size:24px 24px;
+}
+.pomo-strip{
+  position:fixed;z-index:24;left:0;right:0;top:0;height:4px;
+  background:rgba(139,136,128,.22);
+  transition:background .22s,box-shadow .22s;
+  pointer-events:none;
+}
+.pomo-strip.rest-ready{background:var(--accent);box-shadow:0 0 14px color-mix(in srgb,var(--accent) 28%,transparent)}
+.pomo-strip.resting{background:var(--accent);box-shadow:0 0 18px color-mix(in srgb,var(--accent) 42%,transparent)}
+.zen{
+  width:100%;height:100dvh;min-height:100vh;
+  display:grid;grid-template-rows:auto minmax(0,1fr) auto;
+  padding:var(--pad-top) var(--pad-right) var(--pad-bottom) var(--pad-left);
+}
+.top{
+  min-height:28px;display:flex;align-items:flex-start;justify-content:space-between;
+  gap:16px;pointer-events:none;user-select:none;
+}
+.mode-row{display:flex;align-items:center;gap:10px}
+.gear{pointer-events:auto;border:0;padding:0;background:transparent;color:var(--muted);font:600 13px/1 ui-monospace,monospace;opacity:.42;cursor:pointer}
+.gear:hover,.gear:focus-visible{opacity:.9;outline:none}
+.mode{
+  color:var(--muted);
+  font:700 9px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.15em;opacity:.68;
+}
+.top-right{display:flex;align-items:center;gap:12px;pointer-events:auto}
+.pomo{
+  border:0;padding:0;background:transparent;color:var(--muted);
+  font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.06em;opacity:.58;cursor:pointer;
+}
+.pomo.running{opacity:.82}
+.pomo.breaking{color:var(--accent);opacity:.9}
+.clock{
+  color:var(--muted);
+  font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.04em;opacity:.72;
+}
+.editor-wrap{min-height:0;display:flex;justify-content:center;padding:18px 0 10px}
+textarea{
+  width:min(100%,48em);height:100%;min-height:0;margin:0;padding:0;border:0;outline:0;
+  resize:none;background:transparent;color:var(--ink);
+  font-family:"Hina Mincho","Yu Mincho","YuMincho",serif;
+  font-size:var(--editor-size);font-weight:400;line-height:1.85;letter-spacing:.015em;
+  caret-color:var(--accent);
+  -webkit-text-size-adjust:100%;text-size-adjust:100%;
+  overscroll-behavior:contain;scrollbar-width:none;
+}
+textarea::-webkit-scrollbar{display:none}
+textarea::placeholder{color:#aaa79f;opacity:.62}
+.bottom{
+  min-height:24px;display:flex;align-items:flex-end;justify-content:space-between;
+  gap:18px;color:var(--muted);user-select:none;
+}
+.save-state,.count{
+  font:600 9px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.08em;opacity:.60;
+}
+.save-state{display:flex;align-items:center;gap:7px}
+.dot{
+  width:6px;height:6px;border-radius:50%;background:#b3b0aa;
+  transition:background .2s,opacity .2s;
+}
+.save-state.saving .dot{background:var(--accent)}
+.save-state.saved .dot{background:#6d786e}
+.save-state.sent .dot{background:#6d786e}
+.overlay{position:fixed;inset:0;z-index:30;display:none;place-items:center;padding:max(20px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));background:rgba(20,20,18,.38);backdrop-filter:blur(5px)}
+.overlay.open{display:grid}
+.panel{width:min(460px,100%);max-height:min(620px,90dvh);overflow:auto;border-radius:14px;padding:20px;background:#f8f7f2;color:#292924;box-shadow:0 24px 70px rgba(0,0,0,.2)}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
+.panel-title{font:700 11px/1 ui-monospace,monospace;letter-spacing:.12em}
+.close,.settings-save{border:0;border-radius:7px;padding:9px 11px;background:#e9e7e0;color:#292924;font:700 9px/1 ui-monospace,monospace;cursor:pointer}
+.settings-save{background:#292924;color:#faf9f5}
+.field{margin:12px 0}.field label{display:block;margin-bottom:6px;color:#77736c;font:700 8px/1 ui-monospace,monospace;letter-spacing:.08em}
+.field input{width:100%;height:38px;border:1px solid #d7d3ca;border-radius:7px;padding:0 10px;background:#fff;color:#292924;font:13px/1 ui-monospace,monospace;outline:none}
+.panel-foot{display:flex;justify-content:flex-end;margin-top:18px}
+.panel-note{margin:0 0 14px;color:#77736c;font-size:11px;line-height:1.6}
+.toast{position:fixed;z-index:40;left:50%;bottom:max(28px,calc(env(safe-area-inset-bottom) + 18px));transform:translate(-50%,12px);max-width:min(520px,calc(100vw - 40px));padding:9px 12px;border-radius:999px;background:rgba(41,41,36,.92);color:#faf9f5;font:700 10px/1.3 ui-monospace,monospace;opacity:0;pointer-events:none;transition:.18s}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media (orientation:portrait){
+  :root{
+    --editor-size:clamp(30px,7vw,36px);
+    --pad-left:max(24px,calc(env(safe-area-inset-left) + 16px));
+    --pad-right:max(24px,calc(env(safe-area-inset-right) + 16px));
+  }
+  .editor-wrap{padding-top:24px}
+  textarea{line-height:1.9}
+}
+@media (orientation:landscape) and (max-height:520px){
+  :root{
+    --editor-size:clamp(34px,4vw,38px);
+    --pad-top:max(14px,calc(env(safe-area-inset-top) + 10px));
+    --pad-bottom:max(14px,calc(env(safe-area-inset-bottom) + 10px));
+    --pad-left:max(34px,calc(env(safe-area-inset-left) + 20px));
+    --pad-right:max(34px,calc(env(safe-area-inset-right) + 20px));
+  }
+  .top{min-height:20px}
+  .editor-wrap{padding:10px 0 6px}
+  .bottom{min-height:18px}
+}
+@media (orientation:landscape) and (max-height:400px){
+  :root{--editor-size:34px}
+  .mode{opacity:.42}
+  .bottom{opacity:.72}
+}
+@media (prefers-color-scheme:dark){
+  body.auto-dark{
+    --bg:#111310;--ink:#ecebe5;--muted:#777b74;--accent:#d9897f;
+    background-image:radial-gradient(circle at 1px 1px,rgba(255,255,255,.022) 1px,transparent 0);
+  }
+  body.auto-dark textarea::placeholder{color:#777b74}
+}
+</style>
+</head>
+<body class="auto-dark">
+<div class="pomo-strip" id="pomoStrip" aria-hidden="true"></div>
+<main class="zen">
+  <header class="top">
+    <div class="mode-row"><div class="mode">ZEN / FLOW</div><button class="gear" id="gear" type="button" aria-label="GitHub接続設定">⚙</button></div>
+    <div class="top-right"><button class="pomo" id="pomoButton" type="button" aria-label="ポモドーロタイマー">FOCUS 05:00</button><time class="clock" id="clock">--:--</time></div>
+  </header>
+  <section class="editor-wrap">
+    <textarea id="editor" autofocus lang="en" inputmode="text" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off"
+      placeholder="そのまま打つ……" aria-label="ZEN入力欄"></textarea>
+  </section>
+  <footer class="bottom">
+    <div class="save-state saved" id="saveState"><span class="dot"></span><span id="saveLabel">FLOW · ⌘↵ SEND</span></div>
+    <div class="count"><span id="charCount">0</span> chars</div>
+  </footer>
+</main>
+<div class="overlay" id="settingsOverlay" aria-hidden="true">
+  <section class="panel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="panel-head"><div class="panel-title" id="settingsTitle">GITHUB CONNECTION</div><button class="close" id="settingsClose" type="button">CLOSE</button></div>
+    <p class="panel-note">他の禅ノートと同じ接続設定を共有します。送信先の既定値は mynotebook / 00_inbox です。</p>
+    <div class="field"><label for="f-token">TOKEN</label><input id="f-token" type="password" autocomplete="off" placeholder="github_pat_…"></div>
+    <div class="field"><label for="f-owner">OWNER</label><input id="f-owner" type="text"></div>
+    <div class="field"><label for="f-repo">REPOSITORY</label><input id="f-repo" type="text"></div>
+    <div class="field"><label for="f-branch">BRANCH</label><input id="f-branch" type="text"></div>
+    <div class="field"><label for="f-folder">FOLDER</label><input id="f-folder" type="text"></div><div class="field"><label for="f-gemini-key">GEMINI API KEY · FLOW</label><input id="f-gemini-key" type="password" autocomplete="off" placeholder="AIza…"></div><div class="field"><label for="f-gemini-model">MODEL</label><input id="f-gemini-model" type="text" placeholder="gemini-3.6-flash"></div><p class="panel-note">APIキー未設定でもローカルのローマ字→かな処理は動きます。キー設定時は、短い停止のあと直近の文章だけを自動で完成形へ整えます。</p>
+    <div class="panel-foot"><button class="settings-save" id="settingsSave" type="button">SAVE</button></div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+(() => {
+  const editor = document.getElementById('editor');
+  const clock = document.getElementById('clock');
+  const charCount = document.getElementById('charCount');
+  const saveState = document.getElementById('saveState');
+  const saveLabel = document.getElementById('saveLabel');
+  const STORAGE_KEY = 'zen-note-v10-draft';
+  const SETTINGS_KEY = 'zen:settings:github';
+  const DEFAULTS = {owner:'plzsayyes3',repo:'mynotebook',branch:'main',folder:'00_inbox',geminiModel:'gemini-3.6-flash'};
+  const SAVE_DELAY = 20000;
+  const POMO_KEY = 'zen-note-v10-pomodoro';
+  const FOCUS_MS = 5 * 60 * 1000;
+  const BREAK_MS = 1 * 60 * 1000;
+  const STOP_DELAY_MS = 1500;
+  const gear = document.getElementById('gear');
+  const settingsOverlay = document.getElementById('settingsOverlay');
+  const settingsClose = document.getElementById('settingsClose');
+  const settingsSave = document.getElementById('settingsSave');
+  const toast = document.getElementById('toast');
+  const pomoButton = document.getElementById('pomoButton');
+  const pomoStrip = document.getElementById('pomoStrip');
+  let saveTimer = null;
+  let stopTimer = null;
+  let lastInputAt = 0;
+  let isComposing = false;
+  let sending = false;
+  let settings = null;
+  let pomo = {phase:'focus',running:false,endAt:null,remainingMs:FOCUS_MS};
+
+  const updateClock = () => {
+    const now = new Date();
+    clock.textContent = now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+  };
+  const setState = (state,label) => {
+    saveState.classList.remove('saving','saved','sent');
+    saveState.classList.add(state);
+    saveLabel.textContent = label;
+  };
+  const save = () => {
+    localStorage.setItem(STORAGE_KEY,editor.value);
+    setState('saved','SAVED');
+  };
+  const scheduleSave = () => {
+    clearTimeout(saveTimer);
+    setState('saving','WRITING');
+    saveTimer = setTimeout(save,SAVE_DELAY);
+  };
+  const updateCount = () => {
+    charCount.textContent = editor.value.length.toLocaleString('ja-JP');
+  };
+
+  const formatTimer = ms => {
+    const total = Math.max(0,Math.ceil(ms/1000));
+    const min = Math.floor(total/60);
+    const sec = total%60;
+    return `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  };
+  const savePomo = () => {
+    try{localStorage.setItem(POMO_KEY,JSON.stringify(pomo))}catch(e){}
+  };
+  const setStrip = phase => {
+    pomoStrip.classList.toggle('rest-ready',phase==='rest-pending');
+    pomoStrip.classList.toggle('resting',phase==='break');
+  };
+  const startFocus = (autoStart=true) => {
+    clearTimeout(stopTimer);
+    pomo={
+      phase:'focus',
+      running:autoStart,
+      endAt:autoStart?Date.now()+FOCUS_MS:null,
+      remainingMs:FOCUS_MS
+    };
+    setStrip('focus');
+    savePomo();
+    renderPomo();
+  };
+  const beginBreak = () => {
+    clearTimeout(stopTimer);
+    if(pomo.phase!=='rest-pending' || isComposing)return;
+    if(editor.value) save();
+    pomo.phase='break';
+    pomo.running=true;
+    pomo.remainingMs=BREAK_MS;
+    pomo.endAt=Date.now()+BREAK_MS;
+    setStrip('break');
+    savePomo();
+    renderPomo();
+  };
+  const scheduleBreakAfterStop = () => {
+    if(pomo.phase!=='rest-pending' || isComposing)return;
+    clearTimeout(stopTimer);
+    const elapsed=Date.now()-lastInputAt;
+    const wait=Math.max(0,STOP_DELAY_MS-elapsed);
+    stopTimer=setTimeout(()=>{
+      if(!isComposing && pomo.phase==='rest-pending')beginBreak();
+    },wait);
+  };
+  const enterRestPending = () => {
+    clearTimeout(stopTimer);
+    pomo.phase='rest-pending';
+    pomo.running=false;
+    pomo.endAt=null;
+    pomo.remainingMs=BREAK_MS;
+    setStrip('rest-pending');
+    savePomo();
+    renderPomo();
+    scheduleBreakAfterStop();
+  };
+  const returnToPendingBecauseTyping = () => {
+    if(pomo.phase!=='break')return;
+    clearTimeout(stopTimer);
+    pomo.phase='rest-pending';
+    pomo.running=false;
+    pomo.endAt=null;
+    pomo.remainingMs=BREAK_MS;
+    setStrip('rest-pending');
+    savePomo();
+    renderPomo();
+  };
+  const startPomoIfIdle = () => {
+    if(pomo.phase==='rest-pending'){
+      scheduleBreakAfterStop();
+      return;
+    }
+    if(pomo.phase==='break'){
+      returnToPendingBecauseTyping();
+      scheduleBreakAfterStop();
+      return;
+    }
+    if(pomo.running)return;
+    if(pomo.remainingMs<=0 || pomo.remainingMs>FOCUS_MS)pomo.remainingMs=FOCUS_MS;
+    pomo.running=true;
+    pomo.endAt=Date.now()+pomo.remainingMs;
+    savePomo();
+    renderPomo();
+  };
+  const togglePomo = () => {
+    if(pomo.phase==='rest-pending'){
+      scheduleBreakAfterStop();
+      return;
+    }
+    if(pomo.running){
+      pomo.remainingMs=Math.max(0,pomo.endAt-Date.now());
+      pomo.running=false;
+      pomo.endAt=null;
+    }else{
+      if(pomo.remainingMs<=0)pomo.remainingMs=pomo.phase==='focus'?FOCUS_MS:BREAK_MS;
+      pomo.running=true;
+      pomo.endAt=Date.now()+pomo.remainingMs;
+    }
+    savePomo();
+    renderPomo();
+  };
+  const renderPomo = () => {
+    if(pomo.phase==='rest-pending'){
+      pomoButton.textContent='REST READY';
+      pomoButton.classList.remove('running');
+      pomoButton.classList.add('breaking');
+      pomoButton.setAttribute('aria-label','入力が止まると1分休憩を開始');
+      setStrip('rest-pending');
+      return;
+    }
+
+    let remaining=pomo.remainingMs;
+    if(pomo.running && pomo.endAt)remaining=Math.max(0,pomo.endAt-Date.now());
+    pomo.remainingMs=remaining;
+    const label=(pomo.phase==='focus'?'FOCUS ':'REST ')+formatTimer(remaining);
+    pomoButton.textContent=label;
+    pomoButton.classList.toggle('running',pomo.running);
+    pomoButton.classList.toggle('breaking',pomo.phase==='break');
+    pomoButton.setAttribute('aria-label',`${pomo.phase==='focus'?'集中':'休憩'}タイマー ${formatTimer(remaining)} ${pomo.running?'実行中':'一時停止'}`);
+    setStrip(pomo.phase);
+
+    if(pomo.running && remaining<=0){
+      if(pomo.phase==='focus')enterRestPending();
+      else startFocus(true);
+    }
+  };
+  const loadPomo = () => {
+    try{
+      const raw=JSON.parse(localStorage.getItem(POMO_KEY)||'null');
+      if(raw && ['focus','rest-pending','break'].includes(raw.phase)){
+        const maxMs=raw.phase==='focus'?FOCUS_MS:BREAK_MS;
+        const rawRemaining=Number.isFinite(raw.remainingMs)?raw.remainingMs:maxMs;
+        const rawEndAt=Number.isFinite(raw.endAt)?raw.endAt:null;
+        const endRemaining=rawEndAt?rawEndAt-Date.now():rawRemaining;
+        const migrated=rawRemaining>maxMs+5000 || (raw.phase!=='rest-pending' && endRemaining>maxMs+5000);
+        pomo={
+          phase:migrated?'focus':raw.phase,
+          running:migrated?false:Boolean(raw.running),
+          endAt:migrated?null:rawEndAt,
+          remainingMs:migrated?FOCUS_MS:Math.min(maxMs,Math.max(0,rawRemaining))
+        };
+      }
+    }catch(e){}
+
+    if(pomo.phase==='focus' && pomo.running && pomo.endAt && Date.now()>=pomo.endAt){
+      enterRestPending();
+      return;
+    }
+    if(pomo.phase==='break' && pomo.running && pomo.endAt && Date.now()>=pomo.endAt){
+      startFocus(true);
+      return;
+    }
+    if(pomo.phase==='rest-pending')scheduleBreakAfterStop();
+    renderPomo();
+  };
+
+  const showToast = (message) => {
+    toast.textContent = message;
+    toast.classList.add('show');
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => toast.classList.remove('show'),3600);
+  };
+  const pad = n => String(n).padStart(2,'0');
+  const pad3 = n => String(n).padStart(3,'0');
+  const timestampName = () => {
+    const d = new Date();
+    return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}${pad3(d.getMilliseconds())}`;
+  };
+  const b64EncodeUnicode = str => btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,(_,p)=>String.fromCharCode(parseInt(p,16))));
+  const loadSettings = () => {
+    try{settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'null')}catch(e){settings=null}
+  };
+  const openSettings = () => {
+    const s=settings||{};
+    document.getElementById('f-token').value=s.token||'';
+    document.getElementById('f-owner').value=s.owner||DEFAULTS.owner;
+    document.getElementById('f-repo').value=s.repo||DEFAULTS.repo;
+    document.getElementById('f-branch').value=s.branch||DEFAULTS.branch;
+    document.getElementById('f-folder').value=s.folder||DEFAULTS.folder;
+    document.getElementById('f-gemini-key').value=s.geminiKey||'';
+    document.getElementById('f-gemini-model').value=s.geminiModel||DEFAULTS.geminiModel;
+    settingsOverlay.classList.add('open');
+    settingsOverlay.setAttribute('aria-hidden','false');
+  };
+  const closeSettings = () => {
+    settingsOverlay.classList.remove('open');
+    settingsOverlay.setAttribute('aria-hidden','true');
+    requestAnimationFrame(()=>editor.focus());
+  };
+  const saveSettingsNow = () => {
+    settings={
+      token:document.getElementById('f-token').value.trim(),
+      owner:document.getElementById('f-owner').value.trim()||DEFAULTS.owner,
+      repo:document.getElementById('f-repo').value.trim()||DEFAULTS.repo,
+      branch:document.getElementById('f-branch').value.trim()||DEFAULTS.branch,
+      folder:(document.getElementById('f-folder').value.trim()||DEFAULTS.folder).replace(/^\/+|\/+$/g,''),
+      geminiKey:document.getElementById('f-gemini-key').value.trim()||settings?.geminiKey||'',
+      geminiModel:document.getElementById('f-gemini-model').value.trim()||DEFAULTS.geminiModel
+    };
+    try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings))}catch(e){}
+    closeSettings();
+    setState('saved','FLOW · ⌘↵ SEND');
+  };
+  const send = async () => {
+    if(sending)return;
+    clearTimeout(flowLocalTimer);
+    clearTimeout(flowAiTimer);
+    settleLocalFlow();
+    await finishZoneWithAI({force:true});
+    const body=editor.value.trim();
+    if(!body){showToast('送信する内容がありません');return}
+    loadSettings();
+    if(!settings||!settings.token||!settings.owner||!settings.repo){
+      save();
+      openSettings();
+      showToast('先にGitHub接続設定を保存してください');
+      return;
+    }
+    sending=true;
+    clearTimeout(saveTimer);
+    save();
+    setState('saving','SENDING…');
+    const name=timestampName();
+    const folder=(settings.folder||DEFAULTS.folder).replace(/^\/+|\/+$/g,'');
+    const path=`${folder}/${name}.md`;
+    const api=`https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${path}`;
+    const options={
+      method:'PUT',
+      headers:{
+        'Authorization':`Bearer ${settings.token}`,
+        'Accept':'application/vnd.github+json',
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify({
+        message:`Zen v10: ${body.replace(/\s+/g,' ').slice(0,40)}`,
+        content:b64EncodeUnicode(body+'\n'),
+        branch:settings.branch||DEFAULTS.branch
+      })
+    };
+    try{
+      let res=await fetch(api,options);
+      if(res.status===401){
+        await new Promise(r=>setTimeout(r,900));
+        res=await fetch(api,options);
+      }
+      if(!res.ok){
+        const data=await res.json().catch(()=>({}));
+        throw new Error(data.message||`GitHub API error (${res.status})`);
+      }
+      try{localStorage.removeItem(STORAGE_KEY)}catch(e){}
+      editor.value='';
+      updateCount();
+      setState('sent','SENT');
+      showToast('00_inboxへ送信しました');
+      setTimeout(()=>setState('saved','FLOW · ⌘↵ SEND'),1400);
+    }catch(e){
+      save();
+      setState('saved','SEND FAILED · DRAFT SAVED');
+      showToast('送信に失敗しました: '+e.message);
+    }finally{
+      sending=false;
+      requestAnimationFrame(()=>editor.focus());
+    }
+  };
+
+
+  // ---- Zen10 Flow ---------------------------------------------------------
+  // 候補UIや確定操作を持たず、カーソル直前の短い区間だけを自動で整える。
+  const FLOW_LOCAL_IDLE_MS = 420;
+  const FLOW_AI_IDLE_MS = 1050;
+  const FLOW_MAX_ZONE = 220;
+  const FLOW_MAX_CONTEXT = 120;
+  let flowLocalTimer = null;
+  let flowAiTimer = null;
+  let flowSeq = 0;
+  let lastAutoUndo = null;
+  const flowCache = new Map();
+
+  const ROMA = Object.freeze({
+    a:'あ',i:'い',u:'う',e:'え',o:'お',
+    ka:'か',ki:'き',ku:'く',ke:'け',ko:'こ',kya:'きゃ',kyu:'きゅ',kyo:'きょ',
+    sa:'さ',shi:'し',si:'し',su:'す',se:'せ',so:'そ',sha:'しゃ',shu:'しゅ',sho:'しょ',sya:'しゃ',syu:'しゅ',syo:'しょ',
+    ta:'た',chi:'ち',ti:'ち',tsu:'つ',tu:'つ',te:'て',to:'と',cha:'ちゃ',chu:'ちゅ',cho:'ちょ',tya:'ちゃ',tyu:'ちゅ',tyo:'ちょ',
+    na:'な',ni:'に',nu:'ぬ',ne:'ね',no:'の',nya:'にゃ',nyu:'にゅ',nyo:'にょ',
+    ha:'は',hi:'ひ',fu:'ふ',hu:'ふ',he:'へ',ho:'ほ',hya:'ひゃ',hyu:'ひゅ',hyo:'ひょ',fa:'ふぁ',fi:'ふぃ',fe:'ふぇ',fo:'ふぉ',
+    ma:'ま',mi:'み',mu:'む',me:'め',mo:'も',mya:'みゃ',myu:'みゅ',myo:'みょ',
+    ya:'や',yu:'ゆ',yo:'よ',
+    ra:'ら',ri:'り',ru:'る',re:'れ',ro:'ろ',rya:'りゃ',ryu:'りゅ',ryo:'りょ',
+    wa:'わ',wo:'を',
+    ga:'が',gi:'ぎ',gu:'ぐ',ge:'げ',go:'ご',gya:'ぎゃ',gyu:'ぎゅ',gyo:'ぎょ',
+    za:'ざ',ji:'じ',zi:'じ',zu:'ず',ze:'ぜ',zo:'ぞ',ja:'じゃ',ju:'じゅ',jo:'じょ',jya:'じゃ',jyu:'じゅ',jyo:'じょ',
+    da:'だ',di:'ぢ',du:'づ',de:'で',do:'ど',dya:'ぢゃ',dyu:'ぢゅ',dyo:'ぢょ',
+    ba:'ば',bi:'び',bu:'ぶ',be:'べ',bo:'ぼ',bya:'びゃ',byu:'びゅ',byo:'びょ',
+    pa:'ぱ',pi:'ぴ',pu:'ぷ',pe:'ぺ',po:'ぽ',pya:'ぴゃ',pyu:'ぴゅ',pyo:'ぴょ',
+    va:'ゔぁ',vi:'ゔぃ',vu:'ゔ',ve:'ゔぇ',vo:'ゔぉ',wi:'うぃ',we:'うぇ',thi:'てぃ',dhi:'でぃ',twu:'とぅ',dwu:'どぅ'
+  });
+
+  const FLOW_ENGLISH = new Set([
+    'ai','api','app','apps','web','ui','ux','url','html','css','js','javascript','typescript','python','swift',
+    'github','git','push','commit','pull','merge','branch','remote','online','feature','future','code','console','debug','bug','test',
+    'json','markdown','file','folder','mac','windows','iphone','ipad','ios','android','google','gemini','obsidian','wordpress','slack','gmail',
+    'qmk','vial','remap','usb','hid','led','wifi','bluetooth','m5stack','cardputer','zen','note','task','project','inbox','daily',
+    'keyboard','keycap','switch','thocky','creamy','rk65','r65'
+  ]);
+
+  const flowIsVowel = c => /[aiueo]/.test(c);
+  const flowIsConsonant = c => /[a-z]/.test(c) && !flowIsVowel(c);
+
+  function romanRunToKana(raw){
+    if(!raw || raw.length < 2) return raw;
+    if(/[A-Z]/.test(raw.slice(1))) return raw;
+    const s = raw.toLowerCase();
+    if(FLOW_ENGLISH.has(s)) return raw;
+    let out = '';
+    let i = 0;
+    while(i < s.length){
+      const ch = s[i];
+      if(i + 1 < s.length && ch === s[i+1] && flowIsConsonant(ch) && ch !== 'n'){
+        out += 'っ'; i += 1; continue;
+      }
+      if(ch === 'n'){
+        if(i === s.length - 1){ out += 'ん'; i += 1; continue; }
+        const next = s[i+1];
+        if(next === 'n'){ out += 'ん'; i += (i + 2 >= s.length ? 2 : 1); continue; }
+        if(flowIsConsonant(next) && next !== 'y'){ out += 'ん'; i += 1; continue; }
+      }
+      let hit = null;
+      let width = 0;
+      for(const len of [3,2,1]){
+        const part = s.slice(i,i+len);
+        if(ROMA[part]){ hit = ROMA[part]; width = len; break; }
+      }
+      if(!hit) return raw;
+      out += hit;
+      i += width;
+    }
+    return out || raw;
+  }
+
+  function normalizeRomanRuns(text){
+    return text.replace(/[A-Za-z]{2,}/g, token => romanRunToKana(token));
+  }
+
+  function activeFlowZone(value,caret){
+    const before = value.slice(0,caret);
+    const startAfter = Math.max(
+      before.lastIndexOf('\n'),before.lastIndexOf('。'),before.lastIndexOf('！'),
+      before.lastIndexOf('？'),before.lastIndexOf('!'),before.lastIndexOf('?')
+    ) + 1;
+    const start = caret - startAfter > FLOW_MAX_ZONE ? caret - FLOW_MAX_ZONE : startAfter;
+    return {start:start,end:caret,text:value.slice(start,caret)};
+  }
+
+  function canFlow(){
+    return !isComposing && editor.selectionStart === editor.selectionEnd && editor.selectionEnd === editor.value.length;
+  }
+
+  function applyFlowReplacement(start,end,replacement,kind){
+    const before = editor.value;
+    const caretBefore = editor.selectionStart ?? end;
+    const next = before.slice(0,start) + replacement + before.slice(end);
+    if(next === before) return false;
+    const caretAfter = start + replacement.length;
+    editor.value = next;
+    editor.setSelectionRange(caretAfter,caretAfter);
+    lastAutoUndo = {before:before,after:next,caretBefore:caretBefore,caretAfter:caretAfter,kind:kind};
+    updateCount();
+    scheduleSave();
+    return true;
+  }
+
+  function settleLocalFlow(){
+    if(!canFlow()) return false;
+    const caret = editor.selectionEnd;
+    const zone = activeFlowZone(editor.value,caret);
+    if(!/[A-Za-z]{2,}/.test(zone.text)) return false;
+    return applyFlowReplacement(zone.start,zone.end,normalizeRomanRuns(zone.text),'local');
+  }
+
+  async function flowGeminiRequest(model,prompt,apiKey){
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
+      encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(apiKey);
+    const res = await fetch(url,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        contents:[{parts:[{text:prompt}]}],
+        generationConfig:{temperature:0,maxOutputTokens:512}
+      })
+    });
+    if(!res.ok){
+      const raw = await res.text().catch(()=> '');
+      let message = 'Gemini API error (' + res.status + ')';
+      try{ message = JSON.parse(raw).error?.message || message; }catch(_e){}
+      const err = new Error(message);
+      err.status = res.status;
+      throw err;
+    }
+    return res.json();
+  }
+
+  async function flowGeminiWithRetry(model,prompt,apiKey){
+    let current = model;
+    let last = null;
+    for(let attempt=0;attempt<3;attempt++){
+      try{
+        const data = await flowGeminiRequest(current,prompt,apiKey);
+        if(current !== model && settings){
+          settings.geminiModel = current;
+          try{ localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings)); }catch(_e){}
+        }
+        return data;
+      }catch(e){
+        last = e;
+        const replacement = /use\s+models\/([a-zA-Z0-9._-]+)/i.exec(e.message || '');
+        if(replacement?.[1] && replacement[1] !== current){ current = replacement[1]; continue; }
+        if([429,500,503].includes(e.status) && attempt < 2){
+          await new Promise(r => setTimeout(r,650*(attempt+1)));
+          continue;
+        }
+        throw e;
+      }
+    }
+    throw last;
+  }
+
+  function cleanFlowResult(text){
+    return String(text || '').trim();
+  }
+
+  async function finishZoneWithAI(opts){
+    opts = opts || {};
+    loadSettings();
+    if(!settings?.geminiKey || !canFlow()) return false;
+    settleLocalFlow();
+    if(!canFlow()) return false;
+
+    const seq = ++flowSeq;
+    const snapshot = editor.value;
+    const caret = editor.selectionEnd;
+    const zone = activeFlowZone(snapshot,caret);
+    const source = zone.text;
+    if(!source.trim() || source.trim().length < 2) return false;
+    if(!opts.force && !/[ぁ-ゖ一-龯々A-Za-z]/.test(source)) return false;
+
+    const context = snapshot.slice(Math.max(0,zone.start-FLOW_MAX_CONTEXT),zone.start);
+    const cacheKey = context + '\u241e' + source;
+    let result = flowCache.get(cacheKey);
+    setState('saving','FLOWING…');
+
+    try{
+      if(!result){
+        const prompt = [
+          'あなたは日本語入力面の裏側で動く表記整形エンジンです。',
+          'ユーザーに候補選択や確定操作をさせないため、入力途中の短い区間を完成文へ整えます。',
+          '意味、語調、文体は変えないでください。言い換え・要約・補足は禁止です。',
+          'ローマ字で書かれた日本語は自然な日本語へ、ひらがなは一般的な漢字かな交じりへ整えてください。',
+          'GitHub、push、commit、API、Zen10、製品名、コード、URLなど、英字が自然な語は英字のまま保持してください。',
+          '明白な打鍵ミスだけは自然に直して構いません。',
+          '前置き、説明、引用符、コードブロックは付けず、対象区間の完成文だけを返してください。',
+          '直前の文脈: ' + (context || 'なし'),
+          '対象区間: ' + source
+        ].join('\n');
+
+        const data = await flowGeminiWithRetry(settings.geminiModel || DEFAULTS.geminiModel,prompt,settings.geminiKey);
+        result = cleanFlowResult((data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join(''));
+        if(!result) throw new Error('empty result');
+        if(flowCache.size > 120) flowCache.clear();
+        flowCache.set(cacheKey,result);
+      }
+
+      if(seq !== flowSeq || editor.value !== snapshot || editor.selectionEnd !== caret) return false;
+      applyFlowReplacement(zone.start,zone.end,result,'ai');
+      setState('saved','FLOW · ⌘↵ SEND');
+      return true;
+    }catch(e){
+      console.warn('Zen10 flow engine',e);
+      setState('saved','LOCAL FLOW · ⌘↵ SEND');
+      return false;
+    }
+  }
+
+  function scheduleFlow(){
+    clearTimeout(flowLocalTimer);
+    clearTimeout(flowAiTimer);
+    const seq = ++flowSeq;
+    flowLocalTimer = setTimeout(()=>{
+      if(seq !== flowSeq) return;
+      settleLocalFlow();
+    },FLOW_LOCAL_IDLE_MS);
+    flowAiTimer = setTimeout(()=>{
+      if(seq !== flowSeq) return;
+      finishZoneWithAI();
+    },FLOW_AI_IDLE_MS);
+  }
+
+  function undoLastAuto(){
+    if(!lastAutoUndo || editor.value !== lastAutoUndo.after) return false;
+    editor.value = lastAutoUndo.before;
+    const pos = Math.min(lastAutoUndo.caretBefore,editor.value.length);
+    editor.setSelectionRange(pos,pos);
+    lastAutoUndo = null;
+    flowSeq++;
+    updateCount();
+    scheduleSave();
+    setState('saved','FLOW · ⌘↵ SEND');
+    return true;
+  }
+  // ------------------------------------------------------------------------
+
+  loadSettings();
+  loadPomo();
+  const restored = localStorage.getItem(STORAGE_KEY);
+  if(restored){
+    editor.value = restored;
+    setState('saved','RESTORED');
+  }
+
+  editor.addEventListener('compositionstart',() => {
+    isComposing=true;
+    flowSeq++;
+    clearTimeout(flowLocalTimer);
+    clearTimeout(flowAiTimer);
+    clearTimeout(stopTimer);
+    if(pomo.phase==='break')returnToPendingBecauseTyping();
+  });
+  editor.addEventListener('compositionend',() => {
+    isComposing=false;
+    lastInputAt=Date.now();
+    scheduleFlow();
+    if(pomo.phase==='rest-pending')scheduleBreakAfterStop();
+  });
+  editor.addEventListener('input',() => {
+    flowSeq++;
+    lastAutoUndo=null;
+    lastInputAt=Date.now();
+    updateCount();
+    scheduleSave();
+    scheduleFlow();
+    if(pomo.phase==='break')returnToPendingBecauseTyping();
+    if(!isComposing){
+      if(pomo.phase==='rest-pending')scheduleBreakAfterStop();
+      else startPomoIfIdle();
+    }
+  });
+  editor.addEventListener('keydown',event => {
+    if(event.isComposing)return;
+    if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='z'&&!event.shiftKey&&undoLastAuto()){
+      event.preventDefault();
+      return;
+    }
+    if(event.key==='Enter'&&(event.metaKey||event.ctrlKey)){
+      event.preventDefault();
+      send();
+    }
+  });
+  pomoButton.addEventListener('click',togglePomo);
+  gear.addEventListener('click',openSettings);
+  settingsClose.addEventListener('click',closeSettings);
+  settingsSave.addEventListener('click',saveSettingsNow);
+  settingsOverlay.addEventListener('click',event=>{if(event.target===settingsOverlay)closeSettings()});
+  document.addEventListener('visibilitychange',() => {
+    if(document.hidden && editor.value) save();
+  });
+  window.addEventListener('pagehide',() => {
+    if(editor.value) save();
+  });
+
+  updateClock();
+  updateCount();
+  setInterval(updateClock,1000);
+  setInterval(renderPomo,1000);
+  requestAnimationFrame(() => editor.focus());
+})();
+</script>
+<script src="../zen-nav.js"></script>
+</body>
+</html>
