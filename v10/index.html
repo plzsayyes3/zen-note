@@ -530,42 +530,110 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     'keyboard','keycap','switch','thocky','creamy','rk65','r65'
   ]);
 
+  const FLOW_ENGLISH_CASE = Object.freeze({
+    ai:'AI',api:'API',github:'GitHub',git:'Git',json:'JSON',html:'HTML',css:'CSS',js:'JS',
+    usb:'USB',hid:'HID',led:'LED',wifi:'Wi-Fi',bluetooth:'Bluetooth',qmk:'QMK',vial:'Vial',
+    iphone:'iPhone',ipad:'iPad',ios:'iOS',mac:'Mac',windows:'Windows',google:'Google',
+    gemini:'Gemini',obsidian:'Obsidian',wordpress:'WordPress',slack:'Slack',gmail:'Gmail',
+    m5stack:'M5Stack',cardputer:'Cardputer',zen:'Zen',rk65:'RK65',r65:'R65'
+  });
+
   const flowIsVowel = c => /[aiueo]/.test(c);
   const flowIsConsonant = c => /[a-z]/.test(c) && !flowIsVowel(c);
+  const flowKanaOrKanji = /[ぁ-ゖァ-ヺ一-龯々]/;
 
-  function romanRunToKana(raw){
-    if(!raw || raw.length < 2) return raw;
-    if(/[A-Z]/.test(raw.slice(1))) return raw;
-    const s = raw.toLowerCase();
-    if(FLOW_ENGLISH.has(s)) return raw;
+  function romanRunToKanaStrict(s){
     let out = '';
     let i = 0;
     while(i < s.length){
       const ch = s[i];
+
       if(i + 1 < s.length && ch === s[i+1] && flowIsConsonant(ch) && ch !== 'n'){
-        out += 'っ'; i += 1; continue;
+        out += 'っ';
+        i += 1;
+        continue;
       }
+
       if(ch === 'n'){
-        if(i === s.length - 1){ out += 'ん'; i += 1; continue; }
+        if(i === s.length - 1){
+          out += 'ん';
+          i += 1;
+          continue;
+        }
         const next = s[i+1];
-        if(next === 'n'){ out += 'ん'; i += (i + 2 >= s.length ? 2 : 1); continue; }
-        if(flowIsConsonant(next) && next !== 'y'){ out += 'ん'; i += 1; continue; }
+        if(next === 'n'){
+          const after = s[i+2] || '';
+          out += 'ん';
+          // nni / nny... は「ん + に/にゃ...」にするため1文字だけ消費。
+          // nn + 子音 / 語末は通常IME同様、nn全体を1つの「ん」として消費。
+          i += after && (flowIsVowel(after) || after === 'y') ? 1 : 2;
+          continue;
+        }
+        if(flowIsConsonant(next) && next !== 'y'){
+          out += 'ん';
+          i += 1;
+          continue;
+        }
       }
+
       let hit = null;
       let width = 0;
       for(const len of [3,2,1]){
         const part = s.slice(i,i+len);
         if(ROMA[part]){ hit = ROMA[part]; width = len; break; }
       }
-      if(!hit) return raw;
+      if(!hit) return null;
       out += hit;
       i += width;
     }
-    return out || raw;
+    return out || null;
+  }
+
+  function correctSingleSwapTypo(s){
+    if(s.length < 5 || s.length > 16) return null;
+    const candidates = new Set();
+    for(let i=0;i<s.length-1;i++){
+      if(s[i] === s[i+1]) continue;
+      const chars = s.split('');
+      [chars[i],chars[i+1]] = [chars[i+1],chars[i]];
+      const corrected = chars.join('');
+      if(FLOW_ENGLISH.has(corrected)) continue;
+      const kana = romanRunToKanaStrict(corrected);
+      if(kana) candidates.add(kana);
+      if(candidates.size > 1) return null;
+    }
+    return candidates.size === 1 ? [...candidates][0] : null;
+  }
+
+  function romanRunToKana(raw){
+    if(!raw || raw.length < 2) return raw;
+    if(/[A-Z]/.test(raw.slice(1))) return raw;
+    const s = raw.toLowerCase();
+    if(FLOW_ENGLISH.has(s)) return FLOW_ENGLISH_CASE[s] || raw;
+    return romanRunToKanaStrict(s) || correctSingleSwapTypo(s) || raw;
+  }
+
+  function normalizeMixedSurface(text){
+    let value = text;
+
+    // 日本語入力で起きやすい余分な「ん」を吸収。
+    value = value.replace(/ん{2,}/g,'ん');
+
+    // 英数キーボードで打った句読点・長音を、日本語文脈だけ自然な記号へ寄せる。
+    value = value.replace(/([ぁ-ゖァ-ヺ一-龯々])-(?=[ぁ-ゖァ-ヺ])/g,'$1ー');
+    value = value.replace(/([ぁ-ゖァ-ヺ一-龯々])\.(?=\s|$|[ぁ-ゖァ-ヺ一-龯々A-Za-z0-9])/g,'$1。');
+    value = value.replace(/([ぁ-ゖァ-ヺ一-龯々]),(?=\s|$|[ぁ-ゖァ-ヺ一-龯々A-Za-z0-9])/g,'$1、');
+
+    // 日本語と英語の境界ではSpaceを確定操作として扱わず、通常の日本語文の間隔へ戻す。
+    value = value.replace(/([ぁ-ゖァ-ヺ一-龯々])\s+(?=[ぁ-ゖァ-ヺ一-龯々A-Za-z0-9])/g,'$1');
+    value = value.replace(/([A-Za-z0-9])\s+(?=[ぁ-ゖァ-ヺ一-龯々])/g,'$1');
+
+    return value;
   }
 
   function normalizeRomanRuns(text){
-    return text.replace(/[A-Za-z]{2,}/g, token => romanRunToKana(token));
+    const romanized = text.replace(/[A-Za-z]{2,}/g, token => romanRunToKana(token));
+    return normalizeMixedSurface(romanized);
   }
 
   function activeFlowZone(value,caret){
@@ -600,8 +668,9 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     if(!canFlow()) return false;
     const caret = editor.selectionEnd;
     const zone = activeFlowZone(editor.value,caret);
-    if(!/[A-Za-z]{2,}/.test(zone.text)) return false;
-    return applyFlowReplacement(zone.start,zone.end,normalizeRomanRuns(zone.text),'local');
+    const normalized = normalizeRomanRuns(zone.text);
+    if(normalized === zone.text) return false;
+    return applyFlowReplacement(zone.start,zone.end,normalized,'local');
   }
 
   async function flowGeminiRequest(model,prompt,apiKey){
@@ -681,9 +750,11 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
           'あなたは日本語入力面の裏側で動く表記整形エンジンです。',
           'ユーザーに候補選択や確定操作をさせないため、入力途中の短い区間を完成文へ整えます。',
           '意味、語調、文体は変えないでください。言い換え・要約・補足は禁止です。',
-          'ローマ字で書かれた日本語は自然な日本語へ、ひらがなは一般的な漢字かな交じりへ整えてください。',
+          'ローマ字で書かれた日本語は自然な日本語へ、ひらがなは一般的な漢字かな交じりへ整えてください。外来語は一般的なカタカナ表記にしてください。',
           'GitHub、push、commit、API、Zen10、製品名、コード、URLなど、英字が自然な語は英字のまま保持してください。',
-          '明白な打鍵ミスだけは自然に直して構いません。',
+          '日本語文中の不要な半角スペースは除いてください。句読点は日本語文脈なら「、」「。」へ整えてください。',
+          '明白な打鍵ミスだけは自然に直して構いません。特に n/nn の重複や隣接キーの入れ替わりは意味が明白なら吸収してください。',
+          '例: github ni okuru → GitHubに送る / ikeurnoha → いけるのは / なんんで → なんで / すたんんだ-と → スタンダード',
           '前置き、説明、引用符、コードブロックは付けず、対象区間の完成文だけを返してください。',
           '直前の文脈: ' + (context || 'なし'),
           '対象区間: ' + source
@@ -763,6 +834,13 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     lastInputAt=Date.now();
     updateCount();
     scheduleSave();
+
+    // Spaceや句読点は「変換キー」ではなく単なる文字。ただし語境界なので、
+    // その時点までのローカル整形は待たずに即時反映する。
+    const caret = editor.selectionEnd ?? editor.value.length;
+    const tail = editor.value.slice(0,caret).slice(-1);
+    if(!isComposing && /[\s.,!?。、！？]/.test(tail)) settleLocalFlow();
+
     scheduleFlow();
     if(pomo.phase==='break')returnToPendingBecauseTyping();
     if(!isComposing){
