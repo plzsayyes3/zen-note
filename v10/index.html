@@ -589,9 +589,24 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     return out || null;
   }
 
+  const FLOW_COMMON_ROMAJI_TAILS = [
+    'noha','node','noni','noga','kara','kedo','dakedo','made','desu','masu',
+    'suru','shita','shite','nai','naru','tame','toka','toha','demo'
+  ];
+
+  function typoCandidateScore(roman){
+    let score = 0;
+    for(const tail of FLOW_COMMON_ROMAJI_TAILS){
+      if(roman.endsWith(tail)) score = Math.max(score,tail.length + 3);
+    }
+    if(/(?:ni|de|ga|wo|ha|to|mo)$/.test(roman)) score += 1;
+    return score;
+  }
+
   function correctSingleSwapTypo(s){
     if(s.length < 5 || s.length > 16) return null;
-    const candidates = new Set();
+    const candidates = [];
+    const seenKana = new Set();
     for(let i=0;i<s.length-1;i++){
       if(s[i] === s[i+1]) continue;
       const chars = s.split('');
@@ -599,10 +614,18 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
       const corrected = chars.join('');
       if(FLOW_ENGLISH.has(corrected)) continue;
       const kana = romanRunToKanaStrict(corrected);
-      if(kana) candidates.add(kana);
-      if(candidates.size > 1) return null;
+      if(!kana || seenKana.has(kana)) continue;
+      seenKana.add(kana);
+      candidates.push({kana:kana,score:typoCandidateScore(corrected)});
     }
-    return candidates.size === 1 ? [...candidates][0] : null;
+    if(candidates.length === 1) return candidates[0].kana;
+    if(candidates.length < 2) return null;
+
+    candidates.sort((a,b) => b.score - a.score);
+    // 明確に「日本語らしい語尾」が勝つ場合だけ自動修正し、それ以外は触らない。
+    return candidates[0].score > 0 && candidates[0].score > candidates[1].score
+      ? candidates[0].kana
+      : null;
   }
 
   function romanRunToKana(raw){
