@@ -44,7 +44,7 @@ export function mix(a, b, t) {
 export function frameColorAt(progress) {
   const p = Math.max(0, Math.min(1, progress));
   const stops = [
-    [0.00, [7, 10, 18]],
+    [0.00, [22, 52, 95]],
     [0.10, [27, 59, 130]],
     [0.22, [63, 140, 235]],
     [0.36, [107, 90, 226]],
@@ -68,7 +68,7 @@ export function frameColorAt(progress) {
 
 export function frameOpacityAt(progress) {
   const p = Math.max(0, Math.min(1, progress));
-  return 0.14 + p * 0.54;
+  return 0.30 + p * 0.38;
 }
 
 export function sentenceCompleted(insertedText) {
