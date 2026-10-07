@@ -759,10 +759,10 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     return out + text.slice(cursor);
   }
 
-  function clearBoundariesInRange(start,end,replacementLength){
+  function clearBoundariesInRange(start,end,replacementLength,preserveStart=false){
     const delta = replacementLength - (end-start);
     softBoundaries = softBoundaries
-      .filter(pos => pos < start || pos > end)
+      .filter(pos => pos < start || pos > end || (preserveStart && pos === start))
       .map(pos => pos > end ? pos + delta : pos);
   }
 
@@ -786,7 +786,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     const caretBefore = editor.selectionStart ?? end;
     const next = before.slice(0,start) + replacement + before.slice(end);
     if(next === before) return false;
-    clearBoundariesInRange(start,end,replacement.length);
+    clearBoundariesInRange(start,end,replacement.length,kind === 'local');
     const caretAfter = start + replacement.length;
     editor.value = next;
     editor.setSelectionRange(caretAfter,caretAfter);
@@ -907,6 +907,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
           'GitHub、push、commit、API、Zen10、製品名、コード、URLなど、英字が自然な語は英字のまま保持してください。',
           '日本語文中の不要な半角スペースは除いてください。句読点は日本語文脈なら「、」「。」へ整えてください。',
           '明白な打鍵ミスだけは自然に直して構いません。特に n/nn の重複、隣接キーの入れ替わり、1文字程度の余分/不足は意味が明白なら吸収してください。',
+          '長いローマ字の塊の途中に誤打鍵が混ざっていても、前後の日本語文脈から読みが明白なら、塊全体を自然な日本語として復元してください。',
           '入力中の「' + FLOW_BOUNDARY_MARK + '」は、ユーザーがSpaceを押した弱い文節境界です。出力には残さず、解析のヒントとしてだけ使ってください。',
           '例: github ' + FLOW_BOUNDARY_MARK + ' ni ' + FLOW_BOUNDARY_MARK + ' okuru → GitHubに送る / ikeurnoha → いけるのは / なんんで → なんで / すたんんだ-と → スタンダード',
           '前置き、説明、引用符、コードブロックは付けず、対象区間の完成文だけを返してください。',
