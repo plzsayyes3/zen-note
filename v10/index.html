@@ -473,18 +473,26 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
   };
   const send = async () => {
     if(sending)return;
+    sending=true;
+
     settleLocalFlow();
     await finishDocumentWithAI();
+
     const body=editor.value.trim();
-    if(!body){showToast('送信する内容がありません');return}
+    if(!body){
+      sending=false;
+      showToast('送信する内容がありません');
+      return;
+    }
+
     loadSettings();
     if(!settings||!settings.token||!settings.owner||!settings.repo){
+      sending=false;
       save();
       openSettings();
       showToast('先にGitHub接続設定を保存してください');
       return;
     }
-    sending=true;
     clearTimeout(saveTimer);
     save();
     setState('saving','SENDING…');
