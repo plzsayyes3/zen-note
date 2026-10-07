@@ -167,7 +167,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     <div class="field"><label for="f-owner">OWNER</label><input id="f-owner" type="text"></div>
     <div class="field"><label for="f-repo">REPOSITORY</label><input id="f-repo" type="text"></div>
     <div class="field"><label for="f-branch">BRANCH</label><input id="f-branch" type="text"></div>
-    <div class="field"><label for="f-folder">FOLDER</label><input id="f-folder" type="text"></div><div class="field"><label for="f-gemini-key">GEMINI API KEY · FLOW</label><input id="f-gemini-key" type="password" autocomplete="off" placeholder="AIza…"></div><div class="field"><label for="f-gemini-model">MODEL</label><input id="f-gemini-model" type="text" placeholder="gemini-3.6-flash"></div><p class="panel-note">v3 / v6 で保存済みのGemini API設定を自動で流用します。どちらかにキーがあれば再入力は不要です。APIキー未設定でもローカルのローマ字→かな処理は動きます。</p>
+    <div class="field"><label for="f-folder">FOLDER</label><input id="f-folder" type="text"></div><div class="field"><label for="f-gemini-key">GEMINI API KEY · FLOW</label><input id="f-gemini-key" type="password" autocomplete="off" placeholder="AIza…"></div><div class="field"><label for="f-gemini-model">MODEL</label><input id="f-gemini-model" type="text" placeholder="gemini-3.6-flash"></div><p class="panel-note">v3 / v6 で保存済みのGemini API設定を自動で流用します。入力中はローカル変換だけで、GeminiはGitHub送信時の最終整形に1回だけ使います。APIキー未設定でもローカル入力と送信は動きます。</p>
     <div class="panel-foot"><button class="settings-save" id="settingsSave" type="button">SAVE</button></div>
   </section>
 </div>
@@ -473,10 +473,8 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
   };
   const send = async () => {
     if(sending)return;
-    clearTimeout(flowLocalTimer);
-    clearTimeout(flowAiTimer);
     settleLocalFlow();
-    await finishZoneWithAI({force:true});
+    await finishDocumentWithAI();
     const body=editor.value.trim();
     if(!body){showToast('送信する内容がありません');return}
     loadSettings();
@@ -534,19 +532,12 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
   };
 
 
-  // ---- Zen10 Flow ---------------------------------------------------------
-  // 候補UIや確定操作を持たず、カーソル直前の短い区間だけを自動で整える。
-  const FLOW_AI_IDLE_MS = 650;
-  const FLOW_BOUNDARY_AI_MS = 260;
-  const FLOW_MAX_ZONE = 220;
-  const FLOW_MAX_CONTEXT = 120;
+  // ---- Zen10 Input --------------------------------------------------------
+  // 入力中はローカル処理だけ。GeminiはGitHub送信時の最終整形でのみ使う。
   const FLOW_BOUNDARY_MARK = '⟦｜⟧';
-  let flowLocalTimer = null;
-  let flowAiTimer = null;
   let flowSeq = 0;
   let lastAutoUndo = null;
   let softBoundaries = [];
-  const flowCache = new Map();
 
   const ROMA = Object.freeze({
     a:'あ',i:'い',u:'う',e:'え',o:'お',
@@ -809,16 +800,6 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
       .map(pos => pos > end ? pos + delta : pos);
   }
 
-  function activeFlowZone(value,caret){
-    const before = value.slice(0,caret);
-    const startAfter = Math.max(
-      before.lastIndexOf('\n'),before.lastIndexOf('。'),before.lastIndexOf('！'),
-      before.lastIndexOf('？'),before.lastIndexOf('!'),before.lastIndexOf('?')
-    ) + 1;
-    const start = caret - startAfter > FLOW_MAX_ZONE ? caret - FLOW_MAX_ZONE : startAfter;
-    return {start:start,end:caret,text:value.slice(start,caret)};
-  }
-
   function canFlow(){
     return !isComposing && editor.selectionStart === editor.selectionEnd && editor.selectionEnd === editor.value.length;
   }
@@ -875,7 +856,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         contents:[{parts:[{text:prompt}]}],
-        generationConfig:{temperature:0,maxOutputTokens:512}
+        generationConfig:{temperature:0,maxOutputTokens:4096}
       })
     });
     if(!res.ok){
@@ -919,72 +900,59 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     return String(text || '').trim();
   }
 
-  async function finishZoneWithAI(opts){
-    opts = opts || {};
+  async function finishDocumentWithAI(){
     loadSettings();
     if(!settings?.geminiKey || !canFlow()) return false;
-    if(opts.force) settleLocalFlow();
-    else settleLiveTail(false);
+
+    // 送信直前に、末尾に残ったローマ字だけローカルで確定寄りにする。
+    settleLocalFlow();
     if(!canFlow()) return false;
 
     const seq = ++flowSeq;
     const snapshot = editor.value;
     const caret = editor.selectionEnd;
-    const zone = activeFlowZone(snapshot,caret);
-    const source = zone.text;
-    const sourceWithHints = boundaryHintedText(source,zone.start,zone.end);
-    if(!source.trim() || source.trim().length < 2) return false;
-    if(!opts.force && !/[ぁ-ゖ一-龯々A-Za-z]/.test(source)) return false;
+    if(!snapshot.trim()) return false;
 
-    const context = snapshot.slice(Math.max(0,zone.start-FLOW_MAX_CONTEXT),zone.start);
-    const cacheKey = context + '\u241e' + sourceWithHints;
-    let result = flowCache.get(cacheKey);
-    setState('saving','FLOWING…');
+    const sourceWithHints = boundaryHintedText(snapshot,0,snapshot.length);
+    setState('saving','FINALIZING…');
 
     try{
-      if(!result){
-        const prompt = [
-          'あなたは日本語入力面の裏側で動く表記整形エンジンです。',
-          'ユーザーに候補選択や確定操作をさせないため、入力途中の短い区間を完成文へ整えます。',
-          '意味、語調、文体は変えないでください。言い換え・要約・補足は禁止です。',
-          'ローマ字で書かれた日本語は自然な日本語へ、ひらがなは一般的な漢字かな交じりへ整えてください。外来語は一般的なカタカナ表記にしてください。',
-          'GitHub、push、commit、API、Zen10、製品名、コード、URLなど、英字が自然な語は英字のまま保持してください。',
-          '日本語文中の不要な半角スペースは除いてください。句読点は日本語文脈なら「、」「。」へ整えてください。',
-          '明白な打鍵ミスだけは自然に直して構いません。特に n/nn の重複、隣接キーの入れ替わり、1文字程度の余分/不足は意味が明白なら吸収してください。',
-          '長いローマ字の塊の途中に誤打鍵が混ざっていても、前後の日本語文脈から読みが明白なら、塊全体を自然な日本語として復元してください。',
-          '入力中の「' + FLOW_BOUNDARY_MARK + '」は、ユーザーがSpaceを押した弱い文節境界です。出力には残さず、解析のヒントとしてだけ使ってください。',
-          '例: github ' + FLOW_BOUNDARY_MARK + ' ni ' + FLOW_BOUNDARY_MARK + ' okuru → GitHubに送る / ikeurnoha → いけるのは / なんんで → なんで / すたんんだ-と → スタンダード',
-          '前置き、説明、引用符、コードブロックは付けず、対象区間の完成文だけを返してください。',
-          '直前の文脈: ' + (context || 'なし'),
-          '対象区間: ' + sourceWithHints
-        ].join('\n');
+      const prompt = [
+        'あなたは日本語入力の最終整形エンジンです。',
+        '以下はユーザーが書き終え、GitHubへ送信しようとしているノート全文です。',
+        '意味、語調、文体、改行構造は変えないでください。言い換え・要約・補足は禁止です。',
+        '小文字ローマ字で書かれた日本語は自然な日本語へ、ひらがなは文脈に応じて一般的な漢字かな交じりへ整えてください。',
+        '外来語は一般的なカタカナ表記にしてください。',
+        '大文字を含む英字語、GitHub、API、製品名、コード、URLなど英字が自然な語は英字のまま保持してください。',
+        '日本語文中の不要な半角スペースは除き、句読点は自然な日本語表記へ整えてください。',
+        '明白な打鍵ミスだけ修正してください。n/nnの重複、隣接キーの入れ替わり、1文字程度の余分・不足、長いローマ字列中の軽い誤打鍵は、前後の文脈から意味が明白な場合だけ吸収してください。',
+        '「' + FLOW_BOUNDARY_MARK + '」は入力中にSpaceで付けた弱い文節境界です。解析のヒントとしてだけ使い、出力には残さないでください。',
+        '前置き、説明、引用符、コードブロックは付けず、整形済みのノート全文だけを返してください。',
+        'ノート全文:',
+        sourceWithHints
+      ].join('\n');
 
-        const data = await flowGeminiWithRetry(settings.geminiModel || DEFAULTS.geminiModel,prompt,settings.geminiKey);
-        result = cleanFlowResult((data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join(''));
-        if(!result) throw new Error('empty result');
-        if(flowCache.size > 120) flowCache.clear();
-        flowCache.set(cacheKey,result);
-      }
+      const data = await flowGeminiWithRetry(
+        settings.geminiModel || DEFAULTS.geminiModel,
+        prompt,
+        settings.geminiKey
+      );
+      const result = cleanFlowResult(
+        (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('')
+      );
+      if(!result) throw new Error('empty result');
 
+      // AI待ちの間にユーザーが再入力した場合は古い結果を適用しない。
       if(seq !== flowSeq || editor.value !== snapshot || editor.selectionEnd !== caret) return false;
-      applyFlowReplacement(zone.start,zone.end,result,'ai');
+
+      applyFlowReplacement(0,snapshot.length,result,'ai');
       setState('saved','FLOW · ⌘↵ SEND');
       return true;
     }catch(e){
-      console.warn('Zen10 flow engine',e);
-      setState('saved','LOCAL FLOW · ⌘↵ SEND');
+      console.warn('Zen10 finalizer',e);
+      setState('saved','LOCAL ONLY · ⌘↵ SEND');
       return false;
     }
-  }
-
-  function scheduleFlow(boundary=false){
-    clearTimeout(flowLocalTimer);
-    clearTimeout(flowAiTimer);
-    const seq = ++flowSeq;
-    flowAiTimer = setTimeout(()=>{
-      if(seq !== flowSeq) return;
-      finishZoneWithAI();
-    },boundary ? FLOW_BOUNDARY_AI_MS : FLOW_AI_IDLE_MS);
   }
 
   function undoLastAuto(){
@@ -1013,8 +981,6 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
   editor.addEventListener('compositionstart',() => {
     isComposing=true;
     flowSeq++;
-    clearTimeout(flowLocalTimer);
-    clearTimeout(flowAiTimer);
     clearTimeout(stopTimer);
     if(pomo.phase==='break')returnToPendingBecauseTyping();
   });
@@ -1022,7 +988,6 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     isComposing=false;
     lastInputAt=Date.now();
     settleLiveTail(false);
-    scheduleFlow();
     if(pomo.phase==='rest-pending')scheduleBreakAfterStop();
   });
 
@@ -1030,7 +995,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     if(isComposing || event.inputType !== 'insertText' || event.data !== ' ') return;
     if(!canFlow()) return;
 
-    // Spaceは表示文字にせず、直前の語を確定寄りにして「弱い区切り」だけ残す。
+    // Spaceは表示文字にせず、直前の語をローカル確定し「弱い区切り」だけ残す。AI通信はしない。
     event.preventDefault();
     settleLiveTail(true);
     addSoftBoundary(editor.selectionEnd ?? editor.value.length);
@@ -1039,7 +1004,6 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     lastInputAt=Date.now();
     updateCount();
     scheduleSave();
-    scheduleFlow(true);
   });
   editor.addEventListener('input',() => {
     flowSeq++;
@@ -1061,13 +1025,11 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
         addSoftBoundary(editor.selectionEnd ?? caret);
         updateCount();
         scheduleSave();
-        scheduleFlow(true);
       }else{
         // 通常打鍵は待たずに末尾だけローカル変換。未完成音節はASCIIのまま残る。
         settleLiveTail(false);
         updateCount();
         scheduleSave();
-        scheduleFlow(false);
       }
     }else{
       updateCount();
