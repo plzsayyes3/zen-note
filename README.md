@@ -18,7 +18,7 @@
 | v7 | [/v7/](https://plzsayyes3.github.io/zen-note/v7/) | 「箇条書きモード」。1項目ずつ入力し、Enterで次項目、Tab / Shift+Tabまたは画面ボタンで階層化。保存時はMarkdownの箇条書きとしてInboxへ投稿する。 |
 | v8 | [/v8/](https://plzsayyes3.github.io/zen-note/v8/) | 「思考グラフ」。Graph / Text / Cameraを分離し、キーボード中心でノード作成・選択・接続・Zoom / Panを行う。Markdown + UID + hidden edgesとしてInboxへ保存する。 |
 | v9 | [/v9/](https://plzsayyes3.github.io/zen-note/v9/) | 「大文字ジャーナル」。スマホ横画面を主対象に35px前後の大きなHina Mincho系本文、Safe Area + 追加余白、時刻表示、5分集中/1分休憩、GitHub投稿を備える。 |
-| v10 | [/v10/](https://plzsayyes3.github.io/zen-note/v10/) | 「Flow」。英数入力のまま書き続け、420msの停止でローマ字をローカルにかな化、Gemini API Key設定時は約1秒の停止でカーソル直前のsoft zoneだけを自然な完成文へ自動整形する。候補一覧・Space変換・確定操作は持たない。⌘/Ctrl+Zで直前の自動書換えを戻せる。 |\n
+| v10 | [/v10/](https://plzsayyes3.github.io/zen-note/v10/) | 「Flow」。入力中はローカル処理のみで、小文字ローマ字→かな、n/nn、軽いtypo、Spaceのsoft boundaryを扱う。GeminiはGitHub送信時の最終整形に1回だけ使い、漢字かな交じり・カタカナ・残った誤入力を文脈で整える。大文字を含む英字語は英語として保持する。 |
 いずれも対象は `plzsayyes3/mynotebook` を既定値とし、GitHub Token・保存先は各モードの設定画面から変更可能。
 
 ## 仕組み
