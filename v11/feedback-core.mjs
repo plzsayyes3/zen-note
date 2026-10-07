@@ -71,6 +71,16 @@ export function frameOpacityAt(progress) {
   return 0.30 + p * 0.38;
 }
 
+export function frameProgressFromTypingMs(activeTypingMs) {
+  const ms = Math.max(0, Number(activeTypingMs) || 0);
+  const redAt = 5 * 60 * 1000;
+  const whiteAt = 7 * 60 * 1000;
+  const redProgress = 0.84;
+  if (ms <= redAt) return redProgress * (ms / redAt);
+  if (ms >= whiteAt) return 1;
+  return redProgress + (1 - redProgress) * ((ms - redAt) / (whiteAt - redAt));
+}
+
 export function sentenceCompleted(insertedText) {
   return /[。？！\n]/u.test(String(insertedText || ''));
 }
