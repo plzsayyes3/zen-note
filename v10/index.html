@@ -167,7 +167,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     <div class="field"><label for="f-owner">OWNER</label><input id="f-owner" type="text"></div>
     <div class="field"><label for="f-repo">REPOSITORY</label><input id="f-repo" type="text"></div>
     <div class="field"><label for="f-branch">BRANCH</label><input id="f-branch" type="text"></div>
-    <div class="field"><label for="f-folder">FOLDER</label><input id="f-folder" type="text"></div><div class="field"><label for="f-gemini-key">GEMINI API KEY · FLOW</label><input id="f-gemini-key" type="password" autocomplete="off" placeholder="AIza…"></div><div class="field"><label for="f-gemini-model">MODEL</label><input id="f-gemini-model" type="text" placeholder="gemini-3.6-flash"></div><p class="panel-note">APIキー未設定でもローカルのローマ字→かな処理は動きます。キー設定時は、短い停止のあと直近の文章だけを自動で完成形へ整えます。</p>
+    <div class="field"><label for="f-folder">FOLDER</label><input id="f-folder" type="text"></div><div class="field"><label for="f-gemini-key">GEMINI API KEY · FLOW</label><input id="f-gemini-key" type="password" autocomplete="off" placeholder="AIza…"></div><div class="field"><label for="f-gemini-model">MODEL</label><input id="f-gemini-model" type="text" placeholder="gemini-3.6-flash"></div><p class="panel-note">v3 / v6 で保存済みのGemini API設定を自動で流用します。どちらかにキーがあれば再入力は不要です。APIキー未設定でもローカルのローマ字→かな処理は動きます。</p>
     <div class="panel-foot"><button class="settings-save" id="settingsSave" type="button">SAVE</button></div>
   </section>
 </div>
@@ -181,6 +181,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
   const saveLabel = document.getElementById('saveLabel');
   const STORAGE_KEY = 'zen-note-v10-draft';
   const SETTINGS_KEY = 'zen:settings:github';
+  const GEMINI_SETTINGS_KEY = 'zen:settings:gemini';
   const DEFAULTS = {owner:'plzsayyes3',repo:'mynotebook',branch:'main',folder:'00_inbox',geminiModel:'gemini-3.6-flash'};
   const SAVE_DELAY = 20000;
   const POMO_KEY = 'zen-note-v10-pomodoro';
@@ -394,8 +395,49 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}${pad3(d.getMilliseconds())}`;
   };
   const b64EncodeUnicode = str => btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,(_,p)=>String.fromCharCode(parseInt(p,16))));
+  const readLocalJson = (key,fallback={}) => {
+    try{
+      const raw = localStorage.getItem(key);
+      if(!raw) return fallback;
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : fallback;
+    }catch(_e){
+      return fallback;
+    }
+  };
+
+  const syncSharedGeminiSettings = (key,model) => {
+    if(!key) return;
+    const resolvedModel = String(model || DEFAULTS.geminiModel).replace(/^models\//,'');
+    const github = readLocalJson(SETTINGS_KEY,{});
+    const nextGithub = {
+      ...github,
+      geminiKey:key,
+      geminiModel:resolvedModel
+    };
+    const nextGemini = {key:key,model:resolvedModel};
+    try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(nextGithub))}catch(_e){}
+    try{localStorage.setItem(GEMINI_SETTINGS_KEY,JSON.stringify(nextGemini))}catch(_e){}
+  };
+
   const loadSettings = () => {
-    try{settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'null')}catch(e){settings=null}
+    const github = readLocalJson(SETTINGS_KEY,{});
+    const legacyGemini = readLocalJson(GEMINI_SETTINGS_KEY,{});
+
+    // v3は zen:settings:github、v6は zen:settings:gemini を使う。
+    // どちらか片方にだけAPI設定があれば自動で引き継ぐ。
+    const geminiKey = github.geminiKey || legacyGemini.key || '';
+    const geminiModel = github.geminiModel || legacyGemini.model || DEFAULTS.geminiModel;
+
+    settings = {
+      ...DEFAULTS,
+      ...github,
+      geminiKey:geminiKey,
+      geminiModel:String(geminiModel || DEFAULTS.geminiModel).replace(/^models\//,'')
+    };
+
+    // 一度読み込んだら両形式へ同期し、v3/v6/v10で同じAPI設定を共有する。
+    if(geminiKey) syncSharedGeminiSettings(geminiKey,settings.geminiModel);
   };
   const openSettings = () => {
     const s=settings||{};
@@ -422,9 +464,10 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
       branch:document.getElementById('f-branch').value.trim()||DEFAULTS.branch,
       folder:(document.getElementById('f-folder').value.trim()||DEFAULTS.folder).replace(/^\/+|\/+$/g,''),
       geminiKey:document.getElementById('f-gemini-key').value.trim()||settings?.geminiKey||'',
-      geminiModel:document.getElementById('f-gemini-model').value.trim()||DEFAULTS.geminiModel
+      geminiModel:(document.getElementById('f-gemini-model').value.trim()||settings?.geminiModel||DEFAULTS.geminiModel).replace(/^models\//,'')
     };
     try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings))}catch(e){}
+    if(settings.geminiKey) syncSharedGeminiSettings(settings.geminiKey,settings.geminiModel);
     closeSettings();
     setState('saved','FLOW · ⌘↵ SEND');
   };
@@ -855,6 +898,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
         if(current !== model && settings){
           settings.geminiModel = current;
           try{ localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings)); }catch(_e){}
+          if(settings.geminiKey) syncSharedGeminiSettings(settings.geminiKey,current);
         }
         return data;
       }catch(e){
