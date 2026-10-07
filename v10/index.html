@@ -879,7 +879,8 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     opts = opts || {};
     loadSettings();
     if(!settings?.geminiKey || !canFlow()) return false;
-    settleLocalFlow();
+    if(opts.force) settleLocalFlow();
+    else settleLiveTail(false);
     if(!canFlow()) return false;
 
     const seq = ++flowSeq;
@@ -887,11 +888,12 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     const caret = editor.selectionEnd;
     const zone = activeFlowZone(snapshot,caret);
     const source = zone.text;
+    const sourceWithHints = boundaryHintedText(source,zone.start,zone.end);
     if(!source.trim() || source.trim().length < 2) return false;
     if(!opts.force && !/[ぁ-ゖ一-龯々A-Za-z]/.test(source)) return false;
 
     const context = snapshot.slice(Math.max(0,zone.start-FLOW_MAX_CONTEXT),zone.start);
-    const cacheKey = context + '\u241e' + source;
+    const cacheKey = context + '\u241e' + sourceWithHints;
     let result = flowCache.get(cacheKey);
     setState('saving','FLOWING…');
 
@@ -904,11 +906,12 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
           'ローマ字で書かれた日本語は自然な日本語へ、ひらがなは一般的な漢字かな交じりへ整えてください。外来語は一般的なカタカナ表記にしてください。',
           'GitHub、push、commit、API、Zen10、製品名、コード、URLなど、英字が自然な語は英字のまま保持してください。',
           '日本語文中の不要な半角スペースは除いてください。句読点は日本語文脈なら「、」「。」へ整えてください。',
-          '明白な打鍵ミスだけは自然に直して構いません。特に n/nn の重複や隣接キーの入れ替わりは意味が明白なら吸収してください。',
-          '例: github ni okuru → GitHubに送る / ikeurnoha → いけるのは / なんんで → なんで / すたんんだ-と → スタンダード',
+          '明白な打鍵ミスだけは自然に直して構いません。特に n/nn の重複、隣接キーの入れ替わり、1文字程度の余分/不足は意味が明白なら吸収してください。',
+          '入力中の「' + FLOW_BOUNDARY_MARK + '」は、ユーザーがSpaceを押した弱い文節境界です。出力には残さず、解析のヒントとしてだけ使ってください。',
+          '例: github ' + FLOW_BOUNDARY_MARK + ' ni ' + FLOW_BOUNDARY_MARK + ' okuru → GitHubに送る / ikeurnoha → いけるのは / なんんで → なんで / すたんんだ-と → スタンダード',
           '前置き、説明、引用符、コードブロックは付けず、対象区間の完成文だけを返してください。',
           '直前の文脈: ' + (context || 'なし'),
-          '対象区間: ' + source
+          '対象区間: ' + sourceWithHints
         ].join('\n');
 
         const data = await flowGeminiWithRetry(settings.geminiModel || DEFAULTS.geminiModel,prompt,settings.geminiKey);
@@ -929,23 +932,20 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     }
   }
 
-  function scheduleFlow(){
+  function scheduleFlow(boundary=false){
     clearTimeout(flowLocalTimer);
     clearTimeout(flowAiTimer);
     const seq = ++flowSeq;
-    flowLocalTimer = setTimeout(()=>{
-      if(seq !== flowSeq) return;
-      settleLocalFlow();
-    },FLOW_LOCAL_IDLE_MS);
     flowAiTimer = setTimeout(()=>{
       if(seq !== flowSeq) return;
       finishZoneWithAI();
-    },FLOW_AI_IDLE_MS);
+    },boundary ? FLOW_BOUNDARY_AI_MS : FLOW_AI_IDLE_MS);
   }
 
   function undoLastAuto(){
     if(!lastAutoUndo || editor.value !== lastAutoUndo.after) return false;
     editor.value = lastAutoUndo.before;
+    if(Array.isArray(lastAutoUndo.boundariesBefore)) softBoundaries = lastAutoUndo.boundariesBefore.slice();
     const pos = Math.min(lastAutoUndo.caretBefore,editor.value.length);
     editor.setSelectionRange(pos,pos);
     lastAutoUndo = null;
@@ -976,23 +976,59 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
   editor.addEventListener('compositionend',() => {
     isComposing=false;
     lastInputAt=Date.now();
+    settleLiveTail(false);
     scheduleFlow();
     if(pomo.phase==='rest-pending')scheduleBreakAfterStop();
   });
-  editor.addEventListener('input',() => {
+
+  editor.addEventListener('beforeinput',event => {
+    if(isComposing || event.inputType !== 'insertText' || event.data !== ' ') return;
+    if(!canFlow()) return;
+
+    // Spaceは表示文字にせず、直前の語を確定寄りにして「弱い区切り」だけ残す。
+    event.preventDefault();
+    settleLiveTail(true);
+    addSoftBoundary(editor.selectionEnd ?? editor.value.length);
     flowSeq++;
     lastAutoUndo=null;
     lastInputAt=Date.now();
     updateCount();
     scheduleSave();
+    scheduleFlow(true);
+  });
+  editor.addEventListener('input',() => {
+    flowSeq++;
+    lastAutoUndo=null;
+    lastInputAt=Date.now();
 
-    // Spaceや句読点は「変換キー」ではなく単なる文字。ただし語境界なので、
-    // その時点までのローカル整形は待たずに即時反映する。
-    const caret = editor.selectionEnd ?? editor.value.length;
-    const tail = editor.value.slice(0,caret).slice(-1);
-    if(!isComposing && /[\s.,!?。、！？]/.test(tail)) settleLocalFlow();
+    if(!isComposing){
+      let caret = editor.selectionEnd ?? editor.value.length;
+      const tail = editor.value.slice(0,caret).slice(-1);
 
-    scheduleFlow();
+      // beforeinputをキャンセルできない環境向けのSpaceフォールバック。
+      if(tail === ' ' && editor.selectionStart === editor.selectionEnd){
+        const before = editor.value.slice(0,caret-1);
+        const after = editor.value.slice(caret);
+        editor.value = before + after;
+        caret -= 1;
+        editor.setSelectionRange(caret,caret);
+        settleLiveTail(true);
+        addSoftBoundary(editor.selectionEnd ?? caret);
+        updateCount();
+        scheduleSave();
+        scheduleFlow(true);
+      }else{
+        // 通常打鍵は待たずに末尾だけローカル変換。未完成音節はASCIIのまま残る。
+        settleLiveTail(false);
+        updateCount();
+        scheduleSave();
+        scheduleFlow(false);
+      }
+    }else{
+      updateCount();
+      scheduleSave();
+    }
+
     if(pomo.phase==='break')returnToPendingBecauseTyping();
     if(!isComposing){
       if(pomo.phase==='rest-pending')scheduleBreakAfterStop();
