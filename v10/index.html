@@ -493,14 +493,16 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
 
   // ---- Zen10 Flow ---------------------------------------------------------
   // 候補UIや確定操作を持たず、カーソル直前の短い区間だけを自動で整える。
-  const FLOW_LOCAL_IDLE_MS = 420;
-  const FLOW_AI_IDLE_MS = 1050;
+  const FLOW_AI_IDLE_MS = 650;
+  const FLOW_BOUNDARY_AI_MS = 260;
   const FLOW_MAX_ZONE = 220;
   const FLOW_MAX_CONTEXT = 120;
+  const FLOW_BOUNDARY_MARK = '⟦｜⟧';
   let flowLocalTimer = null;
   let flowAiTimer = null;
   let flowSeq = 0;
   let lastAutoUndo = null;
+  let softBoundaries = [];
   const flowCache = new Map();
 
   const ROMA = Object.freeze({
@@ -541,6 +543,22 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
   const flowIsVowel = c => /[aiueo]/.test(c);
   const flowIsConsonant = c => /[a-z]/.test(c) && !flowIsVowel(c);
   const flowKanaOrKanji = /[ぁ-ゖァ-ヺ一-龯々]/;
+
+  const ROMA_PREFIXES = (() => {
+    const set = new Set();
+    Object.keys(ROMA).forEach(key => {
+      for(let i=1;i<key.length;i++) set.add(key.slice(0,i));
+    });
+    return set;
+  })();
+
+  const FLOW_ENGLISH_PREFIXES = (() => {
+    const set = new Set();
+    FLOW_ENGLISH.forEach(word => {
+      for(let i=1;i<word.length;i++) set.add(word.slice(0,i));
+    });
+    return set;
+  })();
 
   function romanRunToKanaStrict(s){
     let out = '';
@@ -628,12 +646,73 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
       : null;
   }
 
-  function romanRunToKana(raw){
-    if(!raw || raw.length < 2) return raw;
+  function romanRunToKana(raw,final=false){
+    if(!raw) return raw;
     if(/[A-Z]/.test(raw.slice(1))) return raw;
     const s = raw.toLowerCase();
-    if(FLOW_ENGLISH.has(s)) return FLOW_ENGLISH_CASE[s] || raw;
-    return romanRunToKanaStrict(s) || correctSingleSwapTypo(s) || raw;
+
+    if(FLOW_ENGLISH.has(s)){
+      return final ? (FLOW_ENGLISH_CASE[s] || raw) : raw;
+    }
+    if(!final && FLOW_ENGLISH_PREFIXES.has(s)) return raw;
+
+    if(final){
+      return romanRunToKanaStrict(s) || correctSingleSwapTypo(s) || raw;
+    }
+
+    let out = '';
+    let i = 0;
+    while(i < s.length){
+      const ch = s[i];
+
+      if(i + 1 < s.length && ch === s[i+1] && flowIsConsonant(ch) && ch !== 'n'){
+        out += 'っ';
+        i += 1;
+        continue;
+      }
+
+      if(ch === 'n'){
+        if(i === s.length - 1){
+          out += raw.slice(i);
+          break;
+        }
+        const next = s[i+1];
+        if(next === 'n'){
+          const after = s[i+2] || '';
+          out += 'ん';
+          i += after && (flowIsVowel(after) || after === 'y') ? 1 : 2;
+          continue;
+        }
+        if(flowIsConsonant(next) && next !== 'y'){
+          out += 'ん';
+          i += 1;
+          continue;
+        }
+      }
+
+      let hit = null;
+      let width = 0;
+      for(const len of [3,2,1]){
+        const part = s.slice(i,i+len);
+        if(ROMA[part]){ hit = ROMA[part]; width = len; break; }
+      }
+
+      if(hit){
+        out += hit;
+        i += width;
+        continue;
+      }
+
+      const rest = s.slice(i);
+      if(ROMA_PREFIXES.has(rest)){
+        out += raw.slice(i);
+        break;
+      }
+
+      out += raw.slice(i);
+      break;
+    }
+    return out || raw;
   }
 
   function normalizeMixedSurface(text){
@@ -654,9 +733,37 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     return value;
   }
 
-  function normalizeRomanRuns(text){
-    const romanized = text.replace(/[A-Za-z]{2,}/g, token => romanRunToKana(token));
+  function normalizeRomanRuns(text,final=false){
+    const romanized = text.replace(/[A-Za-z]+/g, token => romanRunToKana(token,final));
     return normalizeMixedSurface(romanized);
+  }
+
+  function addSoftBoundary(position){
+    const pos = Math.max(0,Math.min(editor.value.length,position));
+    if(!softBoundaries.includes(pos)) softBoundaries.push(pos);
+    softBoundaries.sort((a,b)=>a-b);
+  }
+
+  function boundaryHintedText(text,start,end){
+    const offsets = softBoundaries
+      .filter(pos => pos >= start && pos <= end)
+      .map(pos => pos-start)
+      .sort((a,b)=>a-b);
+    let out = '';
+    let cursor = 0;
+    offsets.forEach(offset => {
+      const safe = Math.max(cursor,Math.min(text.length,offset));
+      out += text.slice(cursor,safe) + FLOW_BOUNDARY_MARK;
+      cursor = safe;
+    });
+    return out + text.slice(cursor);
+  }
+
+  function clearBoundariesInRange(start,end,replacementLength){
+    const delta = replacementLength - (end-start);
+    softBoundaries = softBoundaries
+      .filter(pos => pos < start || pos > end)
+      .map(pos => pos > end ? pos + delta : pos);
   }
 
   function activeFlowZone(value,caret){
@@ -675,25 +782,46 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
 
   function applyFlowReplacement(start,end,replacement,kind){
     const before = editor.value;
+    const boundariesBefore = softBoundaries.slice();
     const caretBefore = editor.selectionStart ?? end;
     const next = before.slice(0,start) + replacement + before.slice(end);
     if(next === before) return false;
+    clearBoundariesInRange(start,end,replacement.length);
     const caretAfter = start + replacement.length;
     editor.value = next;
     editor.setSelectionRange(caretAfter,caretAfter);
-    lastAutoUndo = {before:before,after:next,caretBefore:caretBefore,caretAfter:caretAfter,kind:kind};
+    lastAutoUndo = {
+      before:before,after:next,caretBefore:caretBefore,caretAfter:caretAfter,kind:kind,
+      boundariesBefore:boundariesBefore,boundariesAfter:softBoundaries.slice()
+    };
     updateCount();
     scheduleSave();
     return true;
   }
 
-  function settleLocalFlow(){
+  function settleLiveTail(final=false){
     if(!canFlow()) return false;
     const caret = editor.selectionEnd;
+    const before = editor.value.slice(0,caret);
+    const match = /[A-Za-z]+$/.exec(before);
+    if(!match) return false;
+    const raw = match[0];
+    const replacement = romanRunToKana(raw,final);
+    if(replacement === raw) return false;
+    const start = caret - raw.length;
+    return applyFlowReplacement(start,caret,replacement,'local');
+  }
+
+  function settleLocalFlow(){
+    let changed = settleLiveTail(true);
+    if(!canFlow()) return changed;
+    const caret = editor.selectionEnd;
     const zone = activeFlowZone(editor.value,caret);
-    const normalized = normalizeRomanRuns(zone.text);
-    if(normalized === zone.text) return false;
-    return applyFlowReplacement(zone.start,zone.end,normalized,'local');
+    const normalized = normalizeRomanRuns(zone.text,true);
+    if(normalized !== zone.text){
+      changed = applyFlowReplacement(zone.start,zone.end,normalized,'local') || changed;
+    }
+    return changed;
   }
 
   async function flowGeminiRequest(model,prompt,apiKey){
