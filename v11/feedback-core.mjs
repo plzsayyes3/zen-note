@@ -34,7 +34,41 @@ export function starsPerKey(activeTypingMs) {
 export function starFillLevel(starCount, maxStars) {
   if (!maxStars) return 0;
   const progress = Math.max(0, Math.min(1, starCount / maxStars));
-  return Math.min(1, progress ** 1.6);
+  return Math.min(1, progress ** 1.58);
+}
+
+export function mix(a, b, t) {
+  return a + (b - a) * t;
+}
+
+export function frameColorAt(progress) {
+  const p = Math.max(0, Math.min(1, progress));
+  const stops = [
+    [0.00, [7, 10, 18]],
+    [0.10, [27, 59, 130]],
+    [0.22, [63, 140, 235]],
+    [0.36, [107, 90, 226]],
+    [0.50, [91, 210, 182]],
+    [0.62, [230, 198, 92]],
+    [0.74, [243, 142, 84]],
+    [0.84, [230, 87, 95]],
+    [0.93, [241, 145, 210]],
+    [1.00, [248, 250, 255]]
+  ];
+  for (let i = 1; i < stops.length; i++) {
+    if (p <= stops[i][0]) {
+      const [p0, c0] = stops[i - 1];
+      const [p1, c1] = stops[i];
+      const t = (p - p0) / (p1 - p0 || 1);
+      return c0.map((v, idx) => Math.round(mix(v, c1[idx], t)));
+    }
+  }
+  return stops.at(-1)[1];
+}
+
+export function frameOpacityAt(progress) {
+  const p = Math.max(0, Math.min(1, progress));
+  return 0.14 + p * 0.54;
 }
 
 export function sentenceCompleted(insertedText) {
