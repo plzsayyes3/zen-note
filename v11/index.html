@@ -37,21 +37,17 @@ filter:saturate(1.35) contrast(1.06);transform:scale(1.08)}
 body[data-mode="overdrive"]{--bg:#02030a;--ink:#f8fbff;--caret:#fff;--muted:rgba(230,244,255,.28)}
 body[data-mode="overdrive"] .scene{opacity:.05}
 body[data-mode="overdrive"] .star-canvas,body[data-mode="overdrive"] .star-layer,body[data-mode="overdrive"] .galaxy-layer,body[data-mode="overdrive"] .bubble-layer,body[data-mode="overdrive"] .sunset-layer{opacity:0!important}
-body[data-mode="overdrive"] .overdrive-bg{opacity:calc(.34 + var(--od-energy) * .66);animation:od-bg-spin calc(8s - var(--od-energy) * 4s) linear infinite}
+body[data-mode="overdrive"] .overdrive-bg{opacity:calc(.34 + var(--od-energy) * .66);transform:scale(1.08)}
 body[data-mode="overdrive"] .fx-canvas{opacity:1}
 body[data-mode="overdrive"] textarea{color:#f8fbff;caret-color:#fff;text-shadow:0 0 calc(4px + var(--od-energy) * 12px) hsla(var(--od-hue),100%,72%,calc(.12 + var(--od-energy) * .42))}
 body[data-mode="overdrive"] .frame{border-color:hsla(var(--od-hue),100%,62%,calc(.58 + var(--od-energy) * .36));box-shadow:inset 0 0 10px hsla(var(--od-hue),100%,70%,.28),inset 0 0 calc(28px + var(--od-energy) * 42px) hsla(var(--od-hue),100%,55%,calc(.15 + var(--od-energy) * .45)),0 0 calc(18px + var(--od-energy) * 44px) hsla(var(--od-hue),100%,58%,calc(.2 + var(--od-energy) * .5));transition:border-color .14s linear,box-shadow .14s linear}
-body[data-mode="overdrive"].od-hit main{animation:od-punch .105s ease-out}
-body[data-mode="overdrive"].od-hit .frame{filter:brightness(1.65) saturate(1.35)}
 body[data-mode="overdrive"].od-sentence .sentence-wave{animation:od-wave .7s cubic-bezier(.14,.76,.23,1)}
 body[data-mode="overdrive"].od-sentence .frame{animation:od-frame-burst .7s ease-out}
 body[data-mode="overdrive"].od-sentence textarea{animation:od-text-burst .38s ease-out}
-@keyframes od-bg-spin{to{transform:scale(1.08) rotate(360deg)}}
-@keyframes od-punch{0%{transform:scale(1)}35%{transform:scale(1.004)}100%{transform:scale(1)}}
 @keyframes od-wave{0%{opacity:0;transform:scale(.15);background:radial-gradient(circle at 50% 50%,#fff 0 2%,hsla(var(--od-hue),100%,64%,.9) 6%,transparent 18%)}38%{opacity:.9}100%{opacity:0;transform:scale(1.8);background:radial-gradient(circle at 50% 50%,transparent 0 35%,hsla(var(--od-hue),100%,66%,.55) 40%,transparent 54%)}}
 @keyframes od-frame-burst{0%,100%{filter:brightness(1)}24%{filter:brightness(2.8) saturate(1.8)}}
 @keyframes od-text-burst{0%,100%{filter:brightness(1)}35%{filter:brightness(1.65);text-shadow:0 0 12px #fff,0 0 36px hsl(var(--od-hue) 100% 60%)}}
-@media (prefers-reduced-motion:reduce){body[data-mode="overdrive"] .overdrive-bg{animation:none}body[data-mode="overdrive"].od-hit main,body[data-mode="overdrive"].od-sentence textarea{animation:none}}
+@media (prefers-reduced-motion:reduce){body[data-mode="overdrive"].od-sentence textarea{animation:none}}
 
 </style></head>
 <body>
