@@ -1,10 +1,11 @@
-const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+const PALETTE = [
+  [248,252,255],
+  [83,226,255],
+  [255,92,207],
+  [255,224,92]
+];
 
-function hashCode(value=''){
-  let h=0;
-  for(let i=0;i<value.length;i++) h=((h<<5)-h+value.charCodeAt(i))|0;
-  return Math.abs(h);
-}
+const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 
 export class OverdriveController{
   constructor({canvas}){
@@ -18,7 +19,6 @@ export class OverdriveController{
     this.lastDraw=0;
     this.w=innerWidth;
     this.h=innerHeight;
-    this.hue=205;
     this.lastHitAt=0;
     this.audio=null;
     this.master=null;
@@ -55,38 +55,40 @@ export class OverdriveController{
     this.ctx.setTransform(1,0,0,1,0,0);
   }
 
-  hit(code='',now=Date.now()){
+  hit(_code='',now=Date.now()){
     if(!this.enabled)return;
-
     this.lastHitAt=now;
-    const codeShift=(hashCode(String(code))%19)+7;
-    this.hue=(this.hue+codeShift)%360;
-    document.documentElement.style.setProperty('--od-hue',String(this.hue));
 
     const margin=34;
     const x=margin+Math.random()*Math.max(1,this.w-margin*2);
     const y=margin+Math.random()*Math.max(1,this.h-margin*2);
-    this.spawnOne(x,y,this.hue);
+    const count=4+Math.floor(Math.random()*3);
+    this.spawnBurst(x,y,count);
 
     if(this.bgmEnabled)this.startBgm();
   }
 
   sentenceBurst(){}
 
-  spawnOne(x,y,hue){
-    const angle=Math.random()*Math.PI*2;
-    const speed=18+Math.random()*32;
-    const life=.18+Math.random()*.18;
-    this.particles.push({
-      x,y,px:x,py:y,
-      vx:Math.cos(angle)*speed,
-      vy:Math.sin(angle)*speed,
-      life,max:life,
-      r:.9+Math.random()*1.5,
-      h:(hue-18+Math.random()*36+360)%360
-    });
+  spawnBurst(x,y,count){
+    for(let i=0;i<count;i++){
+      const angle=Math.random()*Math.PI*2;
+      const speed=34+Math.random()*74;
+      const life=.14+Math.random()*.16;
+      const color=PALETTE[Math.floor(Math.random()*PALETTE.length)];
 
-    if(this.particles.length>36)this.particles.splice(0,this.particles.length-36);
+      this.particles.push({
+        x,y,
+        vx:Math.cos(angle)*speed,
+        vy:Math.sin(angle)*speed,
+        life,max:life,
+        r:1.4+Math.random()*2.4,
+        color
+      });
+    }
+
+    if(this.particles.length>84)this.particles.splice(0,this.particles.length-84);
+
     if(!this.raf){
       this.lastFrame=performance.now();
       this.lastDraw=0;
@@ -108,22 +110,36 @@ export class OverdriveController{
 
     const ctx=this.ctx;
     ctx.clearRect(0,0,this.w,this.h);
+    ctx.save();
+    ctx.globalCompositeOperation='lighter';
 
     for(let i=this.particles.length-1;i>=0;i--){
       const p=this.particles[i];
       p.life-=dt;
       if(p.life<=0){this.particles.splice(i,1);continue}
 
-      p.px=p.x;p.py=p.y;
-      p.x+=p.vx*dt;p.y+=p.vy*dt;
-      p.vx*=.96;p.vy*=.96;
+      p.x+=p.vx*dt;
+      p.y+=p.vy*dt;
+      p.vx*=.94;
+      p.vy*=.94;
 
       const alpha=clamp(p.life/p.max,0,1);
-      ctx.fillStyle='hsla('+p.h+',100%,76%,'+(alpha*.78)+')';
+      const [r,g,b]=p.color;
+
+      ctx.fillStyle='rgba('+r+','+g+','+b+','+(alpha*.94)+')';
       ctx.beginPath();
-      ctx.arc(p.x,p.y,p.r*(.55+alpha*.45),0,Math.PI*2);
+      ctx.arc(p.x,p.y,p.r*(.7+alpha*.3),0,Math.PI*2);
       ctx.fill();
+
+      if(alpha>.55){
+        ctx.fillStyle='rgba(255,255,255,'+((alpha-.55)*.72)+')';
+        ctx.beginPath();
+        ctx.arc(p.x,p.y,Math.max(.65,p.r*.38),0,Math.PI*2);
+        ctx.fill();
+      }
     }
+
+    ctx.restore();
 
     if(this.particles.length){
       this.raf=requestAnimationFrame(this.loop);
