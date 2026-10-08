@@ -40,7 +40,7 @@ body[data-mode="overdrive"] .star-canvas,body[data-mode="overdrive"] .star-layer
 body[data-mode="overdrive"] .overdrive-bg{opacity:.34;transform:scale(1.08)}
 body[data-mode="overdrive"] .fx-canvas{opacity:1}
 body[data-mode="overdrive"] textarea{color:#f8fbff;caret-color:#fff;text-shadow:none}
-body[data-mode="overdrive"] .frame{border-color:hsl(var(--od-hue) 100% 62%);box-shadow:none;transition:border-color .08s linear}
+body[data-mode="overdrive"] .frame{border-color:rgba(45,82,138,.72);box-shadow:none;transition:none}
 body[data-mode="overdrive"].od-sentence .sentence-wave{animation:od-wave .7s cubic-bezier(.14,.76,.23,1)}
 body[data-mode="overdrive"].od-sentence .frame{animation:od-frame-burst .7s ease-out}
 body[data-mode="overdrive"].od-sentence textarea{animation:od-text-burst .38s ease-out}
@@ -51,7 +51,7 @@ body[data-mode="overdrive"].od-sentence textarea{animation:od-text-burst .38s ea
 
 </style></head>
 <body>
-<div class="scene" aria-hidden="true"><div class="bubble-layer"></div><div class="sunset-layer"></div><div class="star-layer"></div><div class="galaxy-layer"></div><canvas class="star-canvas" id="starCanvas"></canvas></div><div class="overdrive-bg" aria-hidden="true"></div><canvas class="fx-canvas" id="fxCanvas" aria-hidden="true"></canvas><div class="sentence-wave" aria-hidden="true"></div><div class="frame" aria-hidden="true"></div><div class="overdrive-hud" id="overdriveHud" aria-hidden="true"><span class="od-stage" id="odStage"></span><strong class="od-combo" id="odCombo"></strong></div>
+<div class="scene" aria-hidden="true"><div class="bubble-layer"></div><div class="sunset-layer"></div><div class="star-layer"></div><div class="galaxy-layer"></div><canvas class="star-canvas" id="starCanvas"></canvas></div><div class="overdrive-bg" aria-hidden="true"></div><canvas class="fx-canvas" id="fxCanvas" aria-hidden="true"></canvas><div class="sentence-wave" aria-hidden="true"></div><div class="frame" aria-hidden="true"></div>
 <main><div class="editor-shell"><textarea id="editor" autofocus spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder=""></textarea></div></main>
 <button class="settings-trigger" id="settingsOpen" type="button" aria-label="設定">⚙</button>
 <div class="overlay" id="overlay" aria-hidden="true"><section class="panel" role="dialog" aria-modal="true" aria-label="ZEN v11設定"><h1>ZEN v11 SETTINGS</h1><div class="field"><label for="modeSelect">MODE</label><select id="modeSelect" aria-label="表示モード"><option value="immersion">IMMERSION</option><option value="overdrive">OVERDRIVE</option></select></div><div class="field"><label for="bgmSelect">OVERDRIVE BGM</label><select id="bgmSelect" aria-label="Overdrive BGM"><option value="off">OFF</option><option value="on">ON</option></select></div><div class="field"><label for="token">TOKEN</label><input id="token" type="password" autocomplete="off"></div><div class="field"><label for="owner">OWNER</label><input id="owner" type="text"></div><div class="field"><label for="repo">REPOSITORY</label><input id="repo" type="text"></div><div class="field"><label for="branch">BRANCH</label><input id="branch" type="text"></div><div class="field"><label for="folder">FOLDER</label><input id="folder" type="text"></div><div class="actions"><button class="close" id="settingsClose" type="button">CLOSE</button><button class="save" id="settingsSave" type="button">SAVE</button></div></section></div><div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -67,7 +67,7 @@ const writeSettings=value=>localStorage.setItem(SETTINGS_KEY,JSON.stringify(valu
 const showToast=message=>{toast.textContent=message;toast.classList.add('show');clearTimeout(showToast.t);showToast.t=setTimeout(()=>toast.classList.remove('show'),2600)};
 const saveDraft=()=>{try{localStorage.setItem(DRAFT_KEY,editor.value)}catch{}};const scheduleDraft=()=>{clearTimeout(draftTimer);draftTimer=setTimeout(saveDraft,900)};
 const starCanvas=document.getElementById('starCanvas'),starCtx=starCanvas.getContext('2d',{alpha:true});
-const overdrive=new OverdriveController({editor,canvas:document.getElementById('fxCanvas'),hud:document.getElementById('overdriveHud'),comboEl:document.getElementById('odCombo'),stageEl:document.getElementById('odStage')});
+const overdrive=new OverdriveController({canvas:document.getElementById('fxCanvas')});
 const darkQuery=window.matchMedia('(prefers-color-scheme: dark)');
 const isDark=()=>darkQuery.matches;
 function resizeStarCanvas(){
