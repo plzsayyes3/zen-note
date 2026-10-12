@@ -87,7 +87,11 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
   font:600 9px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace;
   letter-spacing:.08em;opacity:.60;
 }
-.save-state{display:flex;align-items:center;gap:7px}
+.save-actions{display:flex;align-items:center;gap:12px;min-width:0}
+.save-state{display:flex;align-items:center;gap:7px;min-width:0}
+.send-btn{border:0;padding:3px 0;background:transparent;color:var(--muted);font:700 9px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;opacity:.7;cursor:pointer;white-space:nowrap}
+.send-btn:hover,.send-btn:focus-visible{color:var(--ink);opacity:1}
+.send-btn:disabled{opacity:.28;cursor:default}
 .dot{
   width:6px;height:6px;border-radius:50%;background:#b3b0aa;
   transition:background .2s,opacity .2s;
@@ -155,7 +159,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
       placeholder="そのまま打つ……" aria-label="ZEN入力欄"></textarea>
   </section>
   <footer class="bottom">
-    <div class="save-state saved" id="saveState"><span class="dot"></span><span id="saveLabel">FLOW · ⌘↵ SEND</span></div>
+    <div class="save-actions"><div class="save-state saved" id="saveState"><span class="dot"></span><span id="saveLabel">FLOW · Ctrl/⌘↵ SEND</span></div><button class="send-btn" id="sendButton" type="button" title="Ctrl / ⌘ + Enter" aria-label="GitHubへ送信（ControlまたはCommandとEnter）" aria-keyshortcuts="Control+Enter Meta+Enter">SEND ↗</button></div>
     <div class="count"><span id="charCount">0</span> chars</div>
   </footer>
 </main>
@@ -179,6 +183,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
   const charCount = document.getElementById('charCount');
   const saveState = document.getElementById('saveState');
   const saveLabel = document.getElementById('saveLabel');
+  const sendButton = document.getElementById('sendButton');
   const STORAGE_KEY = 'zen-note-v10-draft';
   const SETTINGS_KEY = 'zen:settings:github';
   const GEMINI_SETTINGS_KEY = 'zen:settings:gemini';
@@ -469,11 +474,13 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings))}catch(e){}
     if(settings.geminiKey) syncSharedGeminiSettings(settings.geminiKey,settings.geminiModel);
     closeSettings();
-    setState('saved','FLOW · ⌘↵ SEND');
+    setState('saved','FLOW · Ctrl/⌘↵ SEND');
   };
   const send = async () => {
     if(sending)return;
     sending=true;
+    sendButton.disabled=true;
+    setState('saving','PREPARING…');
 
     settleLocalFlow();
     await finishDocumentWithAI();
@@ -481,6 +488,8 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     const body=editor.value.trim();
     if(!body){
       sending=false;
+      sendButton.disabled=false;
+      setState('saved','FLOW · Ctrl/⌘↵ SEND');
       showToast('送信する内容がありません');
       return;
     }
@@ -488,6 +497,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     loadSettings();
     if(!settings||!settings.token||!settings.owner||!settings.repo){
       sending=false;
+      sendButton.disabled=false;
       save();
       openSettings();
       showToast('先にGitHub接続設定を保存してください');
@@ -528,13 +538,14 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
       updateCount();
       setState('sent','SENT');
       showToast('00_inboxへ送信しました');
-      setTimeout(()=>setState('saved','FLOW · ⌘↵ SEND'),1400);
+      setTimeout(()=>setState('saved','FLOW · Ctrl/⌘↵ SEND'),1400);
     }catch(e){
       save();
       setState('saved','SEND FAILED · DRAFT SAVED');
       showToast('送信に失敗しました: '+e.message);
     }finally{
       sending=false;
+      sendButton.disabled=false;
       requestAnimationFrame(()=>editor.focus());
     }
   };
@@ -954,11 +965,11 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
       if(seq !== flowSeq || editor.value !== snapshot || editor.selectionEnd !== caret) return false;
 
       applyFlowReplacement(0,snapshot.length,result,'ai');
-      setState('saved','FLOW · ⌘↵ SEND');
+      setState('saved','FLOW · Ctrl/⌘↵ SEND');
       return true;
     }catch(e){
       console.warn('Zen10 finalizer',e);
-      setState('saved','LOCAL ONLY · ⌘↵ SEND');
+      setState('saved','LOCAL ONLY · Ctrl/⌘↵ SEND');
       return false;
     }
   }
@@ -973,7 +984,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     flowSeq++;
     updateCount();
     scheduleSave();
-    setState('saved','FLOW · ⌘↵ SEND');
+    setState('saved','FLOW · Ctrl/⌘↵ SEND');
     return true;
   }
   // ------------------------------------------------------------------------
@@ -1056,11 +1067,18 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
       event.preventDefault();
       return;
     }
-    if(event.key==='Enter'&&(event.metaKey||event.ctrlKey)){
-      event.preventDefault();
-      send();
-    }
   });
+  // Global capture also works after using the timer or footer controls.
+  document.addEventListener('keydown',event => {
+    if(!(event.ctrlKey||event.metaKey)) return;
+    if(event.key!=='Enter' && event.code!=='NumpadEnter') return;
+    if(event.isComposing || isComposing || event.keyCode===229) return;
+    if(settingsOverlay.classList.contains('open')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    send();
+  },true);
+  sendButton.addEventListener('click',send);
   pomoButton.addEventListener('click',togglePomo);
   gear.addEventListener('click',openSettings);
   settingsClose.addEventListener('click',closeSettings);
