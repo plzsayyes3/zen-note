@@ -46,7 +46,7 @@ body{
   min-height:28px;display:flex;align-items:flex-start;justify-content:space-between;
   gap:16px;pointer-events:none;user-select:none;
 }
-.mode-row{display:flex;align-items:center;gap:10px}
+.mode-row{display:flex;align-items:center;gap:10px;pointer-events:auto}
 .gear{pointer-events:auto;border:0;padding:0;background:transparent;color:var(--muted);font:600 13px/1 ui-monospace,monospace;opacity:.42;cursor:pointer}
 .gear:hover,.gear:focus-visible{opacity:.9;outline:none}
 .mode{
@@ -89,9 +89,9 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
 }
 .save-actions{display:flex;align-items:center;gap:12px;min-width:0}
 .save-state{display:flex;align-items:center;gap:7px;min-width:0}
-.send-btn{border:0;padding:3px 0;background:transparent;color:var(--muted);font:700 9px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;opacity:.7;cursor:pointer;white-space:nowrap}
-.send-btn:hover,.send-btn:focus-visible{color:var(--ink);opacity:1}
-.send-btn:disabled{opacity:.28;cursor:default}
+.send-btn{border:0;border-radius:8px;padding:9px 13px;background:var(--accent);color:white;font:700 11px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;opacity:1;cursor:pointer;white-space:nowrap;touch-action:manipulation}
+.send-btn:hover,.send-btn:focus-visible{filter:brightness(.93);outline:2px solid var(--ink);outline-offset:2px}
+.send-btn:disabled{opacity:.44;cursor:wait}
 .dot{
   width:6px;height:6px;border-radius:50%;background:#b3b0aa;
   transition:background .2s,opacity .2s;
@@ -151,7 +151,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
 <div class="pomo-strip" id="pomoStrip" aria-hidden="true"></div>
 <main class="zen">
   <header class="top">
-    <div class="mode-row"><div class="mode">ZEN / FLOW</div><button class="gear" id="gear" type="button" aria-label="GitHub接続設定">⚙</button></div>
+    <div class="mode-row"><div class="mode">ZEN / V10 · KANA</div><button class="send-btn send-top" id="sendButton" type="button" aria-label="Geminiで整形してmynotebookに送信" title="Ctrl / ⌘ + Enter" aria-keyshortcuts="Control+Enter Meta+Enter">SEND ↗</button><button class="gear" id="gear" type="button" aria-label="GitHub・Gemini接続設定">⚙</button></div>
     <div class="top-right"><button class="pomo" id="pomoButton" type="button" aria-label="ポモドーロタイマー">FOCUS 05:00</button><time class="clock" id="clock">--:--</time></div>
   </header>
   <section class="editor-wrap">
@@ -159,7 +159,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
       placeholder="そのまま打つ……" aria-label="ZEN入力欄"></textarea>
   </section>
   <footer class="bottom">
-    <div class="save-actions"><div class="save-state saved" id="saveState"><span class="dot"></span><span id="saveLabel">FLOW · Ctrl/⌘↵ SEND</span></div><button class="send-btn" id="sendButton" type="button" title="Ctrl / ⌘ + Enter" aria-label="GitHubへ送信（ControlまたはCommandとEnter）" aria-keyshortcuts="Control+Enter Meta+Enter">SEND ↗</button></div>
+    <div class="save-state saved" id="saveState"><span class="dot"></span><span id="saveLabel">KANA · Ctrl/⌘↵ SEND</span></div>
     <div class="count"><span id="charCount">0</span> chars</div>
   </footer>
 </main>
@@ -171,7 +171,7 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     <div class="field"><label for="f-owner">OWNER</label><input id="f-owner" type="text"></div>
     <div class="field"><label for="f-repo">REPOSITORY</label><input id="f-repo" type="text"></div>
     <div class="field"><label for="f-branch">BRANCH</label><input id="f-branch" type="text"></div>
-    <div class="field"><label for="f-folder">FOLDER</label><input id="f-folder" type="text"></div><div class="field"><label for="f-gemini-key">GEMINI API KEY · FLOW</label><input id="f-gemini-key" type="password" autocomplete="off" placeholder="AIza…"></div><div class="field"><label for="f-gemini-model">MODEL</label><input id="f-gemini-model" type="text" placeholder="gemini-3.6-flash"></div><p class="panel-note">v3 / v6 で保存済みのGemini API設定を自動で流用します。入力中はローカル変換だけで、GeminiはGitHub送信時の最終整形に1回だけ使います。APIキー未設定でもローカル入力と送信は動きます。</p>
+    <div class="field"><label for="f-folder">FOLDER</label><input id="f-folder" type="text"></div><div class="field"><label for="f-gemini-key">GEMINI API KEY · SEND</label><input id="f-gemini-key" type="password" autocomplete="off" placeholder="AIza…"></div><div class="field"><label for="f-gemini-model">MODEL</label><input id="f-gemini-model" type="text" placeholder="gemini-3.6-flash"></div><p class="panel-note">v3 / v6 で保存済みのGemini API設定を自動で流用します。入力中はローマ字→ひらがなのみ。送信時にGeminiで表記を整えてからGitHubへ保存します。Geminiの変換失敗時は送信せず下書きを残します。</p>
     <div class="panel-foot"><button class="settings-save" id="settingsSave" type="button">SAVE</button></div>
   </section>
 </div>
@@ -474,90 +474,57 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings))}catch(e){}
     if(settings.geminiKey) syncSharedGeminiSettings(settings.geminiKey,settings.geminiModel);
     closeSettings();
-    setState('saved','FLOW · Ctrl/⌘↵ SEND');
+    setState('saved','KANA · Ctrl/⌘↵ SEND');
   };
-  const send = async () => {
+  const send=async()=>{
     if(sending)return;
-    sending=true;
-    sendButton.disabled=true;
-    setState('saving','PREPARING…');
-
-    settleLocalFlow();
-    await finishDocumentWithAI();
-
-    const body=editor.value.trim();
-    if(!body){
-      sending=false;
-      sendButton.disabled=false;
-      setState('saved','FLOW · Ctrl/⌘↵ SEND');
-      showToast('送信する内容がありません');
-      return;
-    }
-
     loadSettings();
-    if(!settings||!settings.token||!settings.owner||!settings.repo){
-      sending=false;
-      sendButton.disabled=false;
-      save();
-      openSettings();
-      showToast('先にGitHub接続設定を保存してください');
-      return;
-    }
-    clearTimeout(saveTimer);
-    save();
-    setState('saving','SENDING…');
-    const name=timestampName();
-    const folder=(settings.folder||DEFAULTS.folder).replace(/^\/+|\/+$/g,'');
-    const path=`${folder}/${name}.md`;
-    const api=`https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${path}`;
-    const options={
-      method:'PUT',
-      headers:{
-        'Authorization':`Bearer ${settings.token}`,
-        'Accept':'application/vnd.github+json',
-        'Content-Type':'application/json'
-      },
-      body:JSON.stringify({
-        message:`Zen v10: ${body.replace(/\s+/g,' ').slice(0,40)}`,
-        content:b64EncodeUnicode(body+'\n'),
-        branch:settings.branch||DEFAULTS.branch
-      })
-    };
+    if(!editor.value.trim()){showToast('送信する文章がありません');return;}
+    if(!settings?.token){openSettings();showToast('GitHub Tokenが未設定です');return;}
+    if(!settings?.geminiKey){openSettings();showToast('Gemini APIキーが必要です');return;}
+    sending=true;sendButton.disabled=true;editor.readOnly=true;
+    clearTimeout(saveTimer);save();
     try{
-      let res=await fetch(api,options);
-      if(res.status===401){
-        await new Promise(r=>setTimeout(r,900));
-        res=await fetch(api,options);
+      setState('saving','GEMINI CONVERTING…');
+      const source=convertRomanText(editor.value,true);
+      const body=await finalizeWithGemini(source);
+      setState('saving','GITHUB SENDING…');
+      const folder=(settings.folder||'00_inbox').replace(/^\/+|\/+$/g,'');
+      const pathname=folder+'/'+timestampName()+'.md';
+      const api='https://api.github.com/repos/'+encodeURIComponent(settings.owner||DEFAULTS.owner)+'/'+
+        encodeURIComponent(settings.repo||DEFAULTS.repo)+'/contents/'+pathname.split('/').map(encodeURIComponent).join('/');
+      const response=await fetch(api,{
+        method:'PUT',headers:{
+          'Authorization':'Bearer '+settings.token,
+          'Accept':'application/vnd.github+json',
+          'Content-Type':'application/json'
+        },
+        body:JSON.stringify({
+          message:'Zen v10: '+body.replace(/\s+/g,' ').slice(0,40),
+          content:b64EncodeUnicode(body+'\n'),
+          branch:settings.branch||DEFAULTS.branch
+        })
+      });
+      if(!response.ok){
+        const error=await response.json().catch(()=>({}));
+        throw new Error(error.message||('GitHub API error '+response.status));
       }
-      if(!res.ok){
-        const data=await res.json().catch(()=>({}));
-        throw new Error(data.message||`GitHub API error (${res.status})`);
-      }
-      try{localStorage.removeItem(STORAGE_KEY)}catch(e){}
-      editor.value='';
-      updateCount();
+      localStorage.removeItem(STORAGE_KEY);
+      editor.value='';updateCount();
       setState('sent','SENT');
-      showToast('00_inboxへ送信しました');
-      setTimeout(()=>setState('saved','FLOW · Ctrl/⌘↵ SEND'),1400);
-    }catch(e){
-      save();
-      setState('saved','SEND FAILED · DRAFT SAVED');
-      showToast('送信に失敗しました: '+e.message);
+      showToast('mynotebook / '+folder+' に保存しました');
+      setTimeout(()=>{if(!editor.value)setState('saved','KANA · Ctrl/⌘↵ SEND');},1800);
+    }catch(error){
+      console.error('Zen v10 send failed',error);
+      save();setState('saved','SEND FAILED · DRAFT SAVED');
+      showToast('未送信・下書き保持: '+(error?.message||String(error)));
     }finally{
-      sending=false;
-      sendButton.disabled=false;
+      sending=false;sendButton.disabled=false;editor.readOnly=false;
       requestAnimationFrame(()=>editor.focus());
     }
   };
 
-
-  // ---- Zen10 Input --------------------------------------------------------
-  // 入力中はローカル処理だけ。GeminiはGitHub送信時の最終整形でのみ使う。
-  const FLOW_BOUNDARY_MARK = '⟦｜⟧';
-  let flowSeq = 0;
-  let lastAutoUndo = null;
-  let softBoundaries = [];
-
+  // Only simple lowercase romaji -> hiragana while typing.
   const ROMA = Object.freeze({
     a:'あ',i:'い',u:'う',e:'え',o:'お',
     ka:'か',ki:'き',ku:'く',ke:'け',ko:'こ',kya:'きゃ',kyu:'きゅ',kyo:'きょ',
@@ -574,297 +541,57 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     da:'だ',di:'ぢ',du:'づ',de:'で',do:'ど',dya:'ぢゃ',dyu:'ぢゅ',dyo:'ぢょ',
     ba:'ば',bi:'び',bu:'ぶ',be:'べ',bo:'ぼ',bya:'びゃ',byu:'びゅ',byo:'びょ',
     pa:'ぱ',pi:'ぴ',pu:'ぷ',pe:'ぺ',po:'ぽ',pya:'ぴゃ',pyu:'ぴゅ',pyo:'ぴょ',
-    va:'ゔぁ',vi:'ゔぃ',vu:'ゔ',ve:'ゔぇ',vo:'ゔぉ',wi:'うぃ',we:'うぇ',thi:'てぃ',dhi:'でぃ',twu:'とぅ',dwu:'どぅ'
+    va:'ゔぁ',vi:'ゔぃ',vu:'ゔ',ve:'ゔぇ',vo:'ゔぉ',wi:'うぃ',we:'うぇ',thi:'てぃ',dhi:'でぃ',twu:'とぅ',dwu:'どぅ',xtsu:'っ',ltsu:'っ',ltu:'っ',xa:'ぁ',xi:'ぃ',xu:'ぅ',xe:'ぇ',xo:'ぉ',la:'ぁ',li:'ぃ',lu:'ぅ',le:'ぇ',lo:'ぉ',xya:'ゃ',xyu:'ゅ',xyo:'ょ',lya:'ゃ',lyu:'ゅ',lyo:'ょ',she:'しぇ',che:'ちぇ',je:'じぇ'
   });
-
-  const FLOW_ENGLISH = new Set([
-    'ai','api','app','apps','web','ui','ux','url','html','css','js','javascript','typescript','python','swift',
-    'github','git','push','commit','pull','merge','branch','remote','online','feature','future','code','console','debug','bug','test',
-    'json','markdown','file','folder','mac','windows','iphone','ipad','ios','android','google','gemini','obsidian','wordpress','slack','gmail',
-    'qmk','vial','remap','usb','hid','led','wifi','bluetooth','m5stack','cardputer','zen','note','task','project','inbox','daily',
-    'keyboard','keycap','switch','thocky','creamy','rk65','r65'
-  ]);
-
-  const FLOW_ENGLISH_CASE = Object.freeze({
-    ai:'AI',api:'API',github:'GitHub',git:'Git',json:'JSON',html:'HTML',css:'CSS',js:'JS',
-    usb:'USB',hid:'HID',led:'LED',wifi:'Wi-Fi',bluetooth:'Bluetooth',qmk:'QMK',vial:'Vial',
-    iphone:'iPhone',ipad:'iPad',ios:'iOS',mac:'Mac',windows:'Windows',google:'Google',
-    gemini:'Gemini',obsidian:'Obsidian',wordpress:'WordPress',slack:'Slack',gmail:'Gmail',
-    m5stack:'M5Stack',cardputer:'Cardputer',zen:'Zen',rk65:'RK65',r65:'R65'
-  });
-
-  const flowIsVowel = c => /[aiueo]/.test(c);
-  const flowIsConsonant = c => /[a-z]/.test(c) && !flowIsVowel(c);
-  const flowKanaOrKanji = /[ぁ-ゖァ-ヺ一-龯々]/;
-
-  const ROMA_PREFIXES = (() => {
-    const set = new Set();
-    Object.keys(ROMA).forEach(key => {
-      for(let i=1;i<key.length;i++) set.add(key.slice(0,i));
-    });
-    return set;
-  })();
-
-  const FLOW_ENGLISH_PREFIXES = (() => {
-    const set = new Set();
-    FLOW_ENGLISH.forEach(word => {
-      for(let i=1;i<word.length;i++) set.add(word.slice(0,i));
-    });
-    return set;
-  })();
-
-  function romanRunToKanaStrict(s){
-    let out = '';
-    let i = 0;
-    while(i < s.length){
-      const ch = s[i];
-
-      if(i + 1 < s.length && ch === s[i+1] && flowIsConsonant(ch) && ch !== 'n'){
-        out += 'っ';
-        i += 1;
-        continue;
-      }
-
-      if(ch === 'n'){
-        if(i === s.length - 1){
-          out += 'ん';
-          i += 1;
-          continue;
+  const isVowel=c=>c!==''&&'aiueo'.includes(c);
+  const isConsonant=c=>/^[a-z]$/.test(c)&&!isVowel(c);
+  function toHiragana(raw,final=false){
+    if(!/^[a-z]+$/.test(raw))return raw;
+    let out='',i=0;
+    while(i<raw.length){
+      const ch=raw[i],next=raw[i+1]||'';
+      if(ch==='n'){
+        if(next==='n'){
+          const after=raw[i+2]||'';
+          if(!after){out+=final?'ん':raw.slice(i);break;}
+          out+='ん';i+=isVowel(after)||after==='y'?1:2;continue;
         }
-        const next = s[i+1];
-        if(next === 'n'){
-          const after = s[i+2] || '';
-          out += 'ん';
-          // nni / nny... は「ん + に/にゃ...」にするため1文字だけ消費。
-          // nn + 子音 / 語末は通常IME同様、nn全体を1つの「ん」として消費。
-          i += after && (flowIsVowel(after) || after === 'y') ? 1 : 2;
-          continue;
-        }
-        if(flowIsConsonant(next) && next !== 'y'){
-          out += 'ん';
-          i += 1;
-          continue;
-        }
+        if(!next){out+=final?'ん':'n';break;}
+        if(isConsonant(next)&&next!=='y'){out+='ん';i++;continue;}
       }
-
-      let hit = null;
-      let width = 0;
-      for(const len of [3,2,1]){
-        const part = s.slice(i,i+len);
-        if(ROMA[part]){ hit = ROMA[part]; width = len; break; }
+      if(ch===next&&ch!=='n'&&isConsonant(ch)){
+        if(i+2>=raw.length&&!final){out+=raw.slice(i);break;}
+        out+='っ';i++;continue;
       }
-      if(!hit) return null;
-      out += hit;
-      i += width;
-    }
-    return out || null;
-  }
-
-  const FLOW_COMMON_ROMAJI_TAILS = [
-    'noha','node','noni','noga','kara','kedo','dakedo','made','desu','masu',
-    'suru','shita','shite','nai','naru','tame','toka','toha','demo'
-  ];
-
-  function typoCandidateScore(roman){
-    let score = 0;
-    for(const tail of FLOW_COMMON_ROMAJI_TAILS){
-      if(roman.endsWith(tail)) score = Math.max(score,tail.length + 3);
-    }
-    if(/(?:ni|de|ga|wo|ha|to|mo)$/.test(roman)) score += 1;
-    return score;
-  }
-
-  function correctSingleSwapTypo(s){
-    if(s.length < 5 || s.length > 16) return null;
-    const candidates = [];
-    const seenKana = new Set();
-    for(let i=0;i<s.length-1;i++){
-      if(s[i] === s[i+1]) continue;
-      const chars = s.split('');
-      [chars[i],chars[i+1]] = [chars[i+1],chars[i]];
-      const corrected = chars.join('');
-      if(FLOW_ENGLISH.has(corrected)) continue;
-      const kana = romanRunToKanaStrict(corrected);
-      if(!kana || seenKana.has(kana)) continue;
-      seenKana.add(kana);
-      candidates.push({kana:kana,score:typoCandidateScore(corrected)});
-    }
-    if(candidates.length === 1) return candidates[0].kana;
-    if(candidates.length < 2) return null;
-
-    candidates.sort((a,b) => b.score - a.score);
-    // 明確に「日本語らしい語尾」が勝つ場合だけ自動修正し、それ以外は触らない。
-    return candidates[0].score > 0 && candidates[0].score > candidates[1].score
-      ? candidates[0].kana
-      : null;
-  }
-
-  function romanRunToKana(raw,final=false){
-    if(!raw) return raw;
-    if(/[A-Z]/.test(raw.slice(1))) return raw;
-    const s = raw.toLowerCase();
-
-    if(FLOW_ENGLISH.has(s)){
-      return final ? (FLOW_ENGLISH_CASE[s] || raw) : raw;
-    }
-    if(!final && FLOW_ENGLISH_PREFIXES.has(s)) return raw;
-
-    if(final){
-      return romanRunToKanaStrict(s) || correctSingleSwapTypo(s) || raw;
-    }
-
-    let out = '';
-    let i = 0;
-    while(i < s.length){
-      const ch = s[i];
-
-      if(i + 1 < s.length && ch === s[i+1] && flowIsConsonant(ch) && ch !== 'n'){
-        out += 'っ';
-        i += 1;
-        continue;
+      let found='',width=0;
+      for(let len=4;len>=1;len--){
+        const seq=raw.slice(i,i+len);
+        if(ROMA[seq]){found=ROMA[seq];width=len;break;}
       }
-
-      if(ch === 'n'){
-        if(i === s.length - 1){
-          out += raw.slice(i);
-          break;
-        }
-        const next = s[i+1];
-        if(next === 'n'){
-          const after = s[i+2] || '';
-          out += 'ん';
-          i += after && (flowIsVowel(after) || after === 'y') ? 1 : 2;
-          continue;
-        }
-        if(flowIsConsonant(next) && next !== 'y'){
-          out += 'ん';
-          i += 1;
-          continue;
-        }
-      }
-
-      let hit = null;
-      let width = 0;
-      for(const len of [3,2,1]){
-        const part = s.slice(i,i+len);
-        if(ROMA[part]){ hit = ROMA[part]; width = len; break; }
-      }
-
-      if(hit){
-        out += hit;
-        i += width;
-        continue;
-      }
-
-      const rest = s.slice(i);
-      if(ROMA_PREFIXES.has(rest)){
-        out += raw.slice(i);
-        break;
-      }
-
-      out += raw.slice(i);
-      break;
+      if(found){out+=found;i+=width;continue;}
+      out+=raw.slice(i);break;
     }
-    return out || raw;
+    return out;
   }
-
-  function normalizeMixedSurface(text){
-    let value = text;
-
-    // 日本語入力で起きやすい余分な「ん」を吸収。
-    value = value.replace(/ん{2,}/g,'ん');
-
-    // 英数キーボードで打った句読点・長音を、日本語文脈だけ自然な記号へ寄せる。
-    value = value.replace(/([ぁ-ゖァ-ヺ一-龯々])-(?=[ぁ-ゖァ-ヺ])/g,'$1ー');
-    value = value.replace(/([ぁ-ゖァ-ヺ一-龯々])\.(?=\s|$|[ぁ-ゖァ-ヺ一-龯々A-Za-z0-9])/g,'$1。');
-    value = value.replace(/([ぁ-ゖァ-ヺ一-龯々]),(?=\s|$|[ぁ-ゖァ-ヺ一-龯々A-Za-z0-9])/g,'$1、');
-
-    // 日本語と英語の境界ではSpaceを確定操作として扱わず、通常の日本語文の間隔へ戻す。
-    value = value.replace(/([ぁ-ゖァ-ヺ一-龯々])\s+(?=[ぁ-ゖァ-ヺ一-龯々A-Za-z0-9])/g,'$1');
-    value = value.replace(/([A-Za-z0-9])\s+(?=[ぁ-ゖァ-ヺ一-龯々])/g,'$1');
-
-    return value;
+  function convertRomanText(text,final=false){
+    return text.replace(/[A-Za-z]+/g,raw=>/^[a-z]+$/.test(raw)?toHiragana(raw,final):raw);
   }
-
-  function normalizeRomanRuns(text,final=false){
-    const romanized = text.replace(/[A-Za-z]+/g, token => romanRunToKana(token,final));
-    return normalizeMixedSurface(romanized);
-  }
-
-  function addSoftBoundary(position){
-    const pos = Math.max(0,Math.min(editor.value.length,position));
-    if(!softBoundaries.includes(pos)) softBoundaries.push(pos);
-    softBoundaries.sort((a,b)=>a-b);
-  }
-
-  function boundaryHintedText(text,start,end){
-    const offsets = softBoundaries
-      .filter(pos => pos >= start && pos <= end)
-      .map(pos => pos-start)
-      .sort((a,b)=>a-b);
-    let out = '';
-    let cursor = 0;
-    offsets.forEach(offset => {
-      const safe = Math.max(cursor,Math.min(text.length,offset));
-      out += text.slice(cursor,safe) + FLOW_BOUNDARY_MARK;
-      cursor = safe;
-    });
-    return out + text.slice(cursor);
-  }
-
-  function clearBoundariesInRange(start,end,replacementLength,preserveStart=false){
-    const delta = replacementLength - (end-start);
-    softBoundaries = softBoundaries
-      .filter(pos => pos < start || pos > end || (preserveStart && pos === start))
-      .map(pos => pos > end ? pos + delta : pos);
-  }
-
-  function canFlow(){
-    return !isComposing && editor.selectionStart === editor.selectionEnd && editor.selectionEnd === editor.value.length;
-  }
-
-  function applyFlowReplacement(start,end,replacement,kind){
-    const before = editor.value;
-    const boundariesBefore = softBoundaries.slice();
-    const caretBefore = editor.selectionStart ?? end;
-    const next = before.slice(0,start) + replacement + before.slice(end);
-    if(next === before) return false;
-    clearBoundariesInRange(start,end,replacement.length,kind === 'local');
-    const caretAfter = start + replacement.length;
-    editor.value = next;
-    editor.setSelectionRange(caretAfter,caretAfter);
-    lastAutoUndo = {
-      before:before,after:next,caretBefore:caretBefore,caretAfter:caretAfter,kind:kind,
-      boundariesBefore:boundariesBefore,boundariesAfter:softBoundaries.slice()
-    };
-    updateCount();
-    scheduleSave();
-    return true;
-  }
-
-  function settleLiveTail(final=false){
-    if(!canFlow()) return false;
-    const caret = editor.selectionEnd;
-    const before = editor.value.slice(0,caret);
-    const match = /[A-Za-z]+$/.exec(before);
-    if(!match) return false;
-    const raw = match[0];
-    const replacement = romanRunToKana(raw,final);
-    if(replacement === raw) return false;
-    const start = caret - raw.length;
-    return applyFlowReplacement(start,caret,replacement,'local');
-  }
-
-  function settleLocalFlow(){
-    let changed = settleLiveTail(true);
-    if(!canFlow()) return changed;
-    const caret = editor.selectionEnd;
-    const zone = activeFlowZone(editor.value,caret);
-    const normalized = normalizeRomanRuns(zone.text,true);
-    if(normalized !== zone.text){
-      changed = applyFlowReplacement(zone.start,zone.end,normalized,'local') || changed;
+  function convertAtCaret(){
+    if(isComposing||editor.selectionStart!==editor.selectionEnd)return;
+    const pos=editor.selectionStart,prefix=editor.value.slice(0,pos);
+    const boundary=/([a-z]+)([^A-Za-z])$/.exec(prefix);
+    let from,to,kana;
+    if(boundary){
+      from=pos-boundary[0].length;to=from+boundary[1].length;
+      kana=toHiragana(boundary[1],true);
+    }else{
+      const found=/[A-Za-z]+$/.exec(prefix);
+      if(!found||!/^[a-z]+$/.test(found[0]))return;
+      from=pos-found[0].length;to=pos;kana=toHiragana(found[0],false);
     }
-    return changed;
+    if(editor.value.slice(from,to)===kana)return;
+    editor.value=editor.value.slice(0,from)+kana+editor.value.slice(to);
+    editor.setSelectionRange(from+kana.length,from+kana.length);
   }
 
   async function flowGeminiRequest(model,prompt,apiKey){
@@ -919,75 +646,22 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     return String(text || '').trim();
   }
 
-  async function finishDocumentWithAI(){
-    loadSettings();
-    if(!settings?.geminiKey || !canFlow()) return false;
 
-    // 送信直前に、末尾に残ったローマ字だけローカルで確定寄りにする。
-    settleLocalFlow();
-    if(!canFlow()) return false;
-
-    const seq = ++flowSeq;
-    const snapshot = editor.value;
-    const caret = editor.selectionEnd;
-    if(!snapshot.trim()) return false;
-
-    const sourceWithHints = boundaryHintedText(snapshot,0,snapshot.length);
-    setState('saving','FINALIZING…');
-
-    try{
-      const prompt = [
-        'あなたは日本語入力の最終整形エンジンです。',
-        '以下はユーザーが書き終え、GitHubへ送信しようとしているノート全文です。',
-        '意味、語調、文体、改行構造は変えないでください。言い換え・要約・補足は禁止です。',
-        '小文字ローマ字で書かれた日本語は自然な日本語へ、ひらがなは文脈に応じて一般的な漢字かな交じりへ整えてください。',
-        '外来語は一般的なカタカナ表記にしてください。',
-        '大文字を含む英字語、GitHub、API、製品名、コード、URLなど英字が自然な語は英字のまま保持してください。',
-        '日本語文中の不要な半角スペースは除き、句読点は自然な日本語表記へ整えてください。',
-        '明白な打鍵ミスだけ修正してください。n/nnの重複、隣接キーの入れ替わり、1文字程度の余分・不足、長いローマ字列中の軽い誤打鍵は、前後の文脈から意味が明白な場合だけ吸収してください。',
-        '「' + FLOW_BOUNDARY_MARK + '」は入力中にSpaceで付けた弱い文節境界です。解析のヒントとしてだけ使い、出力には残さないでください。',
-        '前置き、説明、引用符、コードブロックは付けず、整形済みのノート全文だけを返してください。',
-        'ノート全文:',
-        sourceWithHints
-      ].join('\n');
-
-      const data = await flowGeminiWithRetry(
-        settings.geminiModel || DEFAULTS.geminiModel,
-        prompt,
-        settings.geminiKey
-      );
-      const result = cleanFlowResult(
-        (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('')
-      );
-      if(!result) throw new Error('empty result');
-
-      // AI待ちの間にユーザーが再入力した場合は古い結果を適用しない。
-      if(seq !== flowSeq || editor.value !== snapshot || editor.selectionEnd !== caret) return false;
-
-      applyFlowReplacement(0,snapshot.length,result,'ai');
-      setState('saved','FLOW · Ctrl/⌘↵ SEND');
-      return true;
-    }catch(e){
-      console.warn('Zen10 finalizer',e);
-      setState('saved','LOCAL ONLY · Ctrl/⌘↵ SEND');
-      return false;
-    }
+  async function finalizeWithGemini(text){
+    const prompt=[
+      'あなたは日本語ノートの最終表記変換器です。',
+      '以下はローマ字からひらがなへ単純変換したノートです。',
+      '自然な漢字かな交じり・外来語のカタカナに変換してください。',
+      '明白な打鍵ミスだけ修正し、意味、文体、改行、箇条書き、固有名詞、URL、英字の略語を保持してください。',
+      '要約、補足、文意の変更、勝手な意訳、説明は禁止します。',
+      '結果の本文だけを返してください。',
+      'ノート全文:',text
+    ].join('\n');
+    const data=await flowGeminiWithRetry(settings.geminiModel||DEFAULTS.geminiModel,prompt,settings.geminiKey);
+    const converted=(data?.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('').trim();
+    if(!converted)throw new Error('Geminiが変換結果を返しませんでした');
+    return converted;
   }
-
-  function undoLastAuto(){
-    if(!lastAutoUndo || editor.value !== lastAutoUndo.after) return false;
-    editor.value = lastAutoUndo.before;
-    if(Array.isArray(lastAutoUndo.boundariesBefore)) softBoundaries = lastAutoUndo.boundariesBefore.slice();
-    const pos = Math.min(lastAutoUndo.caretBefore,editor.value.length);
-    editor.setSelectionRange(pos,pos);
-    lastAutoUndo = null;
-    flowSeq++;
-    updateCount();
-    scheduleSave();
-    setState('saved','FLOW · Ctrl/⌘↵ SEND');
-    return true;
-  }
-  // ------------------------------------------------------------------------
 
   loadSettings();
   loadPomo();
@@ -997,86 +671,31 @@ textarea::placeholder{color:#aaa79f;opacity:.62}
     setState('saved','RESTORED');
   }
 
-  editor.addEventListener('compositionstart',() => {
-    isComposing=true;
-    flowSeq++;
-    clearTimeout(stopTimer);
+  editor.addEventListener('compositionstart',()=>{
+    isComposing=true;clearTimeout(stopTimer);
     if(pomo.phase==='break')returnToPendingBecauseTyping();
   });
-  editor.addEventListener('compositionend',() => {
-    isComposing=false;
-    lastInputAt=Date.now();
-    settleLiveTail(false);
+  editor.addEventListener('compositionend',()=>{
+    isComposing=false;lastInputAt=Date.now();convertAtCaret();
+    updateCount();scheduleSave();
     if(pomo.phase==='rest-pending')scheduleBreakAfterStop();
   });
-
-  editor.addEventListener('beforeinput',event => {
-    if(isComposing || event.inputType !== 'insertText' || event.data !== ' ') return;
-    if(!canFlow()) return;
-
-    // Spaceは表示文字にせず、直前の語をローカル確定し「弱い区切り」だけ残す。AI通信はしない。
-    event.preventDefault();
-    settleLiveTail(true);
-    addSoftBoundary(editor.selectionEnd ?? editor.value.length);
-    flowSeq++;
-    lastAutoUndo=null;
+  editor.addEventListener('input',()=>{
     lastInputAt=Date.now();
-    updateCount();
-    scheduleSave();
-  });
-  editor.addEventListener('input',() => {
-    flowSeq++;
-    lastAutoUndo=null;
-    lastInputAt=Date.now();
-
-    if(!isComposing){
-      let caret = editor.selectionEnd ?? editor.value.length;
-      const tail = editor.value.slice(0,caret).slice(-1);
-
-      // beforeinputをキャンセルできない環境向けのSpaceフォールバック。
-      if(tail === ' ' && editor.selectionStart === editor.selectionEnd){
-        const before = editor.value.slice(0,caret-1);
-        const after = editor.value.slice(caret);
-        editor.value = before + after;
-        caret -= 1;
-        editor.setSelectionRange(caret,caret);
-        settleLiveTail(true);
-        addSoftBoundary(editor.selectionEnd ?? caret);
-        updateCount();
-        scheduleSave();
-      }else{
-        // 通常打鍵は待たずに末尾だけローカル変換。未完成音節はASCIIのまま残る。
-        settleLiveTail(false);
-        updateCount();
-        scheduleSave();
-      }
-    }else{
-      updateCount();
-      scheduleSave();
-    }
-
+    if(!isComposing)convertAtCaret();
+    updateCount();scheduleSave();
     if(pomo.phase==='break')returnToPendingBecauseTyping();
     if(!isComposing){
       if(pomo.phase==='rest-pending')scheduleBreakAfterStop();
       else startPomoIfIdle();
     }
   });
-  editor.addEventListener('keydown',event => {
-    if(event.isComposing)return;
-    if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='z'&&!event.shiftKey&&undoLastAuto()){
-      event.preventDefault();
-      return;
-    }
-  });
-  // Global capture also works after using the timer or footer controls.
-  document.addEventListener('keydown',event => {
-    if(!(event.ctrlKey||event.metaKey)) return;
-    if(event.key!=='Enter' && event.code!=='NumpadEnter') return;
-    if(event.isComposing || isComposing || event.keyCode===229) return;
-    if(settingsOverlay.classList.contains('open')) return;
-    event.preventDefault();
-    event.stopPropagation();
-    send();
+  document.addEventListener('keydown',event=>{
+    if(!(event.metaKey||event.ctrlKey))return;
+    if(event.key!=='Enter'&&event.code!=='NumpadEnter')return;
+    if(event.isComposing||isComposing||event.keyCode===229)return;
+    if(settingsOverlay.classList.contains('open'))return;
+    event.preventDefault();event.stopPropagation();send();
   },true);
   sendButton.addEventListener('click',send);
   pomoButton.addEventListener('click',togglePomo);
